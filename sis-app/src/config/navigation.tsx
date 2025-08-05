@@ -68,7 +68,21 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Scheduling',
     path: '/scheduling',
     icon: <EventNoteIcon />,
-    roles: ['admin'],
+    roles: ['admin', 'teacher', 'student'],
+    children: [
+      {
+        label: 'Master Schedule',
+        path: '/scheduling/master',
+        icon: <EventNoteIcon />,
+        roles: ['admin'],
+      },
+      {
+        label: 'My Schedule',
+        path: '/scheduling/student',
+        icon: <CalendarTodayIcon />,
+        roles: ['student', 'teacher'],
+      },
+    ],
   },
   {
     label: 'Attendance',

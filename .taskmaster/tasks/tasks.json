@@ -416,7 +416,7 @@
           4,
           5
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -424,7 +424,7 @@
             "description": "Create PostgreSQL schema, NestJS models, and REST endpoints for managing courses and their offered sections.",
             "dependencies": [],
             "details": "• Schema: tables `courses` (id, code, title, credits, term, description) and `sections` (id, course_id FK, teacher_id FK, room, day_of_week, start_time, end_time, term, period).\n• NestJS: use TypeORM entities, DTO validation with class-validator.\n• Endpoints: /courses (GET, POST), /courses/:id (GET, PATCH, DELETE); /sections (GET, POST), /sections/:id (GET, PATCH, DELETE).\n• Include pagination, filtering by term, and eager loading of sections when fetching a course.\n• Seed script with sample data for local testing.\n• Security: protect routes with RBAC guards from Task 3.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Jest + Supertest unit/integration tests covering all CRUD paths, validation failures, and RBAC access rules."
           },
           {
@@ -435,7 +435,7 @@
               1
             ],
             "details": "• Algorithm: build an interval graph where vertices are section instances and edges represent time overlaps (use provided `hasConflict`).\n• Detect conflicts by checking for any connected components with >1 node on same student list; return boolean and conflicting pairs.\n• Encapsulate in NestJS provider `ScheduleValidatorService`.\n• Endpoint: POST /schedules/validate { sectionIds: number[] } → { isValid: boolean, conflicts: SectionPair[] }.\n• Performance: for large lists, use sweep-line technique instead of O(n²) comparison.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests with handcrafted overlapping/non-overlapping datasets; property-based tests generating random intervals to ensure no false negatives."
           },
           {
@@ -446,7 +446,7 @@
               1
             ],
             "details": "• Tech: React 18 + MUI + react-beautiful-dnd; consume CRUD API via SWR.\n• Course Catalog Page: table listing courses with search, add/edit drawer form.\n• Master Schedule Page: 5×8 grid (days × periods). Sections appear as draggable chips; dropping triggers PATCH to update section day/period.\n• Visual cues for conflicts: after each drop, call /schedules/validate with all sections in that time slot; highlight red if conflict.\n• Use component library from Task 4 for form inputs and table.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Cypress E2E: create course, add section, drag section to grid cell, verify API call, and UI conflict highlight. Visual regression snapshots for grid dragging."
           },
           {
@@ -458,7 +458,7 @@
               2
             ],
             "details": "• Algorithm: recursive backtracking exploring section combinations; prune branches early using conflict validator (from Subtask 2) and current best gap count.\n• Input: list of desired courseIds (and optional preferred teachers/periods).\n• Output: chosen sectionIds, gapCount, unfulfilledCourses[].\n• NestJS microservice `AutoSchedulerService`; configure worker queue (BullMQ + Redis) to process heavy jobs asynchronously.\n• Endpoint: POST /students/:id/schedule/generate; job status polling /jobs/:id.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests on algorithm with synthetic datasets to ensure gap minimization; integration test creating student & course data, running scheduler, verifying no overlaps and all required courses assigned when possible."
           },
           {
@@ -471,7 +471,7 @@
               4
             ],
             "details": "• Backend: /schedules/:userId (GET) returns consolidated schedule (sections, rooms, times); /schedules/:userId/pdf (GET) streams PDF.\n• PDF generation: use pdfmake; template includes institution logo, day columns, period rows, highlighted lunch blocks.\n• Frontend: TeacherSchedulePage and StudentSchedulePage using responsive grid; button 'Export to PDF' triggers file download.\n• Caching: store generated PDFs for 24 h in S3 or local FS to reduce regeneration.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "API tests ensure correct data & PDF MIME type; Cypress tests verifying schedule renders, export downloads valid file; visual diff tests on generated PDF using pdf-snapshot library."
           }
         ]
@@ -689,7 +689,7 @@
     ],
     "metadata": {
       "created": "2025-08-05T07:27:53.608Z",
-      "updated": "2025-08-05T09:44:27.744Z",
+      "updated": "2025-08-05T18:59:40.424Z",
       "description": "Tasks for master context"
     }
   }

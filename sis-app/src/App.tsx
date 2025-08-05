@@ -13,6 +13,7 @@ import { StudentProfile } from './pages/Students/StudentProfile';
 import ApplicationsList from './pages/Admissions/ApplicationsList';
 import ApplicationForm from './pages/Admissions/ApplicationForm';
 import EnrollmentWizard from './pages/Enrollment/EnrollmentWizard';
+import { CourseCatalog, MasterSchedule, StudentSchedule, StudentScheduling } from './pages/Scheduling';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,8 +54,13 @@ function App() {
                     <Route path="applications/:id" element={<div>Application Details - Coming Soon</div>} />
                   </Route>
                   <Route path="enrollment/:studentId" element={<EnrollmentWizard />} />
-                  <Route path="courses" element={<div>Courses - Coming Soon</div>} />
-                  <Route path="scheduling" element={<div>Scheduling - Coming Soon</div>} />
+                  <Route path="courses" element={<CourseCatalog />} />
+                  <Route path="scheduling">
+                    <Route index element={<Navigate to="master" replace />} />
+                    <Route path="master" element={<MasterSchedule />} />
+                    <Route path="student" element={<StudentSchedule />} />
+                    <Route path="register" element={<StudentScheduling />} />
+                  </Route>
                   <Route path="attendance" element={<div>Attendance - Coming Soon</div>} />
                   <Route path="grades" element={<div>Grades - Coming Soon</div>} />
                   <Route path="reports" element={<div>Reports - Coming Soon</div>} />

@@ -6,6 +6,10 @@ import applicationRoutes from './routes/applicationRoutes';
 import enrollmentRoutes from './routes/enrollmentRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import studentRoutes from './routes/studentRoutes';
+import courseRoutes from './routes/courseRoutes';
+import schedulingRoutes from './routes/schedulingRoutes';
+import staffRoutes from './routes/staffRoutes';
+import schoolRoutes from './routes/schoolRoutes';
 
 dotenv.config();
 
@@ -33,6 +37,10 @@ app.use('/api', applicationRoutes);
 app.use('/api', enrollmentRoutes);
 app.use('/api', webhookRoutes);
 app.use('/api', studentRoutes);
+app.use('/api', courseRoutes);
+app.use('/api', schedulingRoutes);
+app.use('/api', staffRoutes);
+app.use('/api', schoolRoutes);
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
