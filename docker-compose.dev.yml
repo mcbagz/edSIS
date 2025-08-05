@@ -1,0 +1,44 @@
+version: '3.8'
+
+# Development configuration - integrates with existing Ed-Fi Docker setup
+services:
+  # Only PostgreSQL for development (backend and frontend run locally)
+  sis-postgres:
+    image: postgres:15-alpine
+    container_name: sis-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - sis-postgres-dev-data:/var/lib/postgresql/data
+    networks:
+      - sis-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sis-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@school.edu
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    networks:
+      - sis-dev-network
+    depends_on:
+      - sis-postgres
+
+volumes:
+  sis-postgres-dev-data:
+
+networks:
+  sis-dev-network:
+    driver: bridge

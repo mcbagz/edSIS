@@ -1,0 +1,696 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Project Repository & Environment Setup",
+        "description": "Create mono-repo, choose tech stack, configure development, staging, and production environments with automated CI/CD.",
+        "details": "• Tech stack: React 18 + TypeScript (frontend), Node.js 20 + NestJS 10 (backend), PostgreSQL 15 (DB), Redis (cache/session), Docker Compose for local dev.\n• Initialise Git repository and branch strategy (main, develop, feature/*).\n• Create Dockerfiles for FE and BE, docker-compose.yml with Postgres and Redis services.\n• Configure ESLint, Prettier, Husky pre-commit hooks.\n• Setup GitHub Actions pipeline: build → test → lint → docker build/push → deploy (to AWS ECS or similar).\n• Provision `.env.example` with secure variable placeholders.\n• Add Makefile / npm scripts for common tasks (lint, test, migrate, start:dev).",
+        "testStrategy": "CI pipeline runs unit tests (Jest) and lints code on every pull request. Validate Docker image boots successfully with health-checks returning 200. Manual QA: clone repo, `docker-compose up`, ensure FE loads login screen.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize mono-repo and baseline project structure",
+            "description": "Create a Git mono-repository with separate frontend and backend packages, choose package manager/workspace tool, and scaffold initial applications.",
+            "dependencies": [],
+            "details": "• Create remote repository on GitHub named, e.g., school-suite.\n• git init locally, add origin, push first empty commit.\n• Choose pnpm or Yarn workspaces; add root package.json with \"workspaces\": [\"apps/frontend\", \"apps/backend\"].\n• Scaffold React 18 + TypeScript app inside apps/frontend using Vite or CRA.\n• Scaffold NestJS 10 app inside apps/backend using Nest CLI with --package-manager pnpm.\n• Add .gitignore, README, license.\n• Commit skeleton code on main, create develop branch, document branch strategy (main, develop, feature/*, hotfix/*) in CONTRIBUTING.md.",
+            "status": "done",
+            "testStrategy": "Clone fresh, run `pnpm install` then `pnpm -r run build` to verify both apps compile without errors."
+          },
+          {
+            "id": 2,
+            "title": "Containerize services for local development",
+            "description": "Create Dockerfiles for frontend and backend, compose file for full stack with PostgreSQL and Redis, and environment template files.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Write multi-stage Dockerfile for apps/backend: build stage (npm ci, npm run build) → runtime stage (node:20-alpine, copy dist/). Expose 3000.\n• Write Dockerfile for apps/frontend: build stage (npm ci, npm run build) → nginx:alpine serving /dist. Expose 80.\n• docker-compose.yml at repo root: services frontend, backend, postgres:15, redis:latest. Add healthcheck scripts.\n• Mount local volume for postgres to persist data.\n• Configure networks and environment variables; reference .env.dev.\n• Add .env.example with placeholders for DB credentials, JWT secret, etc.\n• Update README with `docker-compose up --build` instructions.",
+            "status": "done",
+            "testStrategy": "Run `docker-compose up --build`, ensure healthchecks all return healthy and `curl localhost:80` serves React app, `curl localhost:3000/health` returns 200."
+          },
+          {
+            "id": 3,
+            "title": "Establish code quality and developer tooling",
+            "description": "Add shared ESLint + Prettier configurations, commit hooks, and convenience scripts.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Install eslint, @typescript-eslint/*, eslint-config-prettier, prettier at root; create .eslintrc.js extending recommended + prettier.\n• Create .prettierrc and .editorconfig.\n• Install husky and lint-staged; configure pre-commit hook running `pnpm lint-staged`.\n• Add lint and format scripts in root package.json plus workspaces.\n• Provide Makefile commands: install, lint, test, compose-up, compose-down.\n• Commit sample failing lint to verify hook rejects, then fix and recommit.",
+            "status": "done",
+            "testStrategy": "`pnpm run lint` passes on clean code; create intentional lint error and commit—husky should block commit."
+          },
+          {
+            "id": 4,
+            "title": "Implement automated CI pipeline with GitHub Actions",
+            "description": "Create workflow that builds, tests, lints, and builds/pushes Docker images for develop and main branches.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "• .github/workflows/ci.yml triggers on PR and push.\n• Jobs: setup (checkout, setup Node 20, pnpm install), lint (`pnpm run lint`), test (`pnpm -r run test:ci`), build (`pnpm -r run build`).\n• Build Docker images using docker/build-push-action; tag with branch name + SHA; push to GitHub Container Registry.\n• Cache node_modules with actions/cache.\n• Require passing status checks before merging via branch protection rules.",
+            "status": "done",
+            "testStrategy": "Open PR with code; check Actions tab for successful lint/test/build and that images are pushed and visible in GHCR."
+          },
+          {
+            "id": 5,
+            "title": "Configure environment-specific deployment and continuous delivery",
+            "description": "Provision infrastructure definitions and extend CI pipeline to deploy to AWS ECS (or chosen platform) for development, staging, and production environments.",
+            "dependencies": [
+              4
+            ],
+            "details": "• Use Terraform or AWS CDK in infra/ directory to define VPC, ECS cluster, Fargate services, ALB, RDS Postgres, Elasticache Redis.\n• Parameterize env (dev, staging, prod) using workspaces/variables referencing container image tags.\n• Store secrets in AWS SSM Parameter Store; configure IAM roles for GH Actions OIDC.\n• Add deploy job to ci.yml triggered on successful build of main (staging) and release/* (prod): retrieves image tag, runs `terraform apply -auto-approve` or `cdk deploy` with environment variable.\n• Implement blue/green ECS deployment strategy for zero downtime.\n• Document rollback procedure in RUNBOOK.md.",
+            "status": "done",
+            "testStrategy": "Merge to main – pipeline should update staging service and ECS task should become healthy. Promote to prod via release/* branch and verify ALB health. Run `terraform plan` in PRs to show diff."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Design & Implement Core Database Schema",
+        "description": "Create relational schema covering students, guardians, staff, roles, courses, sections, enrollment, grades, attendance, and disciplinary incidents.",
+        "details": "• Use Prisma ORM. Define models: User (id, email, passwordHash), Role (ADMIN, TEACHER, PARENT, STUDENT), Student (FK→User), Guardian (FK→User), StudentGuardian (junction, relationshipType), Staff (FK→User), Course, Department, Section, Enrollment, Assignment, Grade, AttendanceRecord, DisciplinaryIncident, CustomField, CustomFieldValue.\n• Add auditing fields (createdAt, updatedAt, deletedAt) via Prisma middleware for soft deletes.\n• Use PostgreSQL UUID primary keys.\n• Generate initial migration & seed script for roles and sample data.",
+        "testStrategy": "Run `prisma migrate dev` against test DB, verify all tables exist. Write Prisma unit tests using sqlite in-memory to assert FK constraints, indexes and cascading behavior. Use `npm run seed` to ensure seed executes without errors.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Prisma models and relationships",
+            "description": "Create the initial `schema.prisma` file containing all required entities, enumerations, and relations covering users, roles, students, guardians, staff, academics, and custom-field support.",
+            "dependencies": [],
+            "details": "• Set provider to `postgresql` and generator to `prisma-client-js`.\n• For every table in the high-level spec add a model with a `String @id @default(uuid()) @db.Uuid` primary key.\n• Add enum `RoleEnum { ADMIN TEACHER PARENT STUDENT }` and map it to Role model or inline field as needed.\n• Implement relations:\n  – One-to-one User↔Student, User↔Guardian, User↔Staff (optional fields on User with `@relation` back-references).\n  – Many-to-many Student↔Guardian via explicit `StudentGuardian` junction (include `relationshipType` enum field).\n  – Course↔Section (one-to-many), Section↔Enrollment (one-to-many), Enrollment↔Grade (one-to-many).\n  – AttendanceRecord references Student, Section (nullable for daily), and AttendanceCode.\n  – DisciplinaryIncident references Student, Staff (reporter), Section (nullable).\n  – CustomField↔CustomFieldValue: polymorphic support via `targetType` + `targetId` or dedicated FK fields.\n• Ensure all foreign keys have `onDelete: Cascade` where appropriate (e.g., Enrollment when Student deleted).\n• Run `prisma format` to validate schema syntactically.",
+            "status": "done",
+            "testStrategy": "Compile with `prisma validate` to catch syntax errors. Run `prisma generate` and instantiate a temporary SQLite DB (`DATABASE_URL=\"file:memdb?mode=memory&cache=shared\"`) to ensure client builds successfully."
+          },
+          {
+            "id": 2,
+            "title": "Add auditing fields and soft-delete middleware",
+            "description": "Introduce `createdAt`, `updatedAt`, and `deletedAt` on all top-level models and implement a Prisma middleware to automate timestamps and soft deletes.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Add `createdAt DateTime @default(now())`, `updatedAt DateTime @updatedAt`, `deletedAt DateTime?` to every persistent model in `schema.prisma` (exclude junction tables unless needed).\n• Create `src/prisma/middleware/softDelete.ts`:\n  – Intercept `delete`/`deleteMany` actions; convert to `update`/`updateMany` setting `deletedAt` to `new Date()`.\n  – Intercept `find*` operations; inject `deletedAt: null` condition unless `includeDeleted` flag is passed via `params.args` meta.\n• Register middleware in Prisma client instantiation.\n• Update types so service layer can opt-in to include/exclude deleted records.",
+            "status": "done",
+            "testStrategy": "Unit test middleware with Jest: create record, call `delete`, assert row still exists with `deletedAt` set; default `findMany` should omit it, `findMany({ includeDeleted: true })` should return it."
+          },
+          {
+            "id": 3,
+            "title": "Configure database connection & generate initial migration",
+            "description": "Set up PostgreSQL connection env vars, verify UUID extension, and create the first migration that materialises the full schema including auditing fields.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Add `DATABASE_URL` to `.env` (e.g., `postgresql://user:pass@localhost:5432/sis_dev`).\n• Ensure `CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";` is executed via `prisma/migrations` `start.sql` or a raw SQL migration step.\n• Run `npx prisma migrate dev --name init_core_schema` to create migration files and apply to local DB.\n• Commit generated `prisma/migrations/**`.\n• Verify tables exist in Postgres via `psql` or Prisma `db pull` round-trip.",
+            "status": "done",
+            "testStrategy": "CI step runs `prisma migrate deploy` against a fresh Postgres container and exits with non-zero if migration fails. Manual smoke test: connect with Prisma client and create dummy Student with related entities."
+          },
+          {
+            "id": 4,
+            "title": "Implement seed scripts for roles and sample data",
+            "description": "Create a deterministic seed routine that inserts core reference data (roles, departments, attendance codes) and a minimal demo dataset of users, students, guardians, staff, courses, and sections.",
+            "dependencies": [
+              3
+            ],
+            "details": "• Add `prisma/seed.ts` and reference it in `package.json` (`\"prisma\": { \"seed\": \"ts-node prisma/seed.ts\" }`).\n• Insert rows:\n  – Roles: ADMIN, TEACHER, PARENT, STUDENT.\n  – AttendanceCode: P=Present, A=Absent, U=Unexcused.\n  – Departments: e.g., MATH, SCIENCE.\n  – Create sample Users with bcrypt-hashed passwords and assign Student/Guardian/Staff records accordingly.\n  – Insert one Course per department, one Section per course, enroll sample student, attach guardian.\n• Wrap inserts in transactions; use `prisma.$transaction`.\n• Make seeding idempotent (use `upsert`).",
+            "status": "done",
+            "testStrategy": "Run `npm run seed` after `prisma migrate reset` in CI; assert process exits 0. Add Jest test that re-runs seed to confirm idempotency (row counts unchanged)."
+          },
+          {
+            "id": 5,
+            "title": "Create automated schema integrity and migration tests",
+            "description": "Add unit/integration test suite verifying FK constraints, cascading behavior, and successful soft-delete interaction using an in-memory SQLite DB for speed and CI isolation.",
+            "dependencies": [
+              4
+            ],
+            "details": "• Configure Jest with `--runInBand` and use `DATABASE_URL=\"file:test.db?mode=memory&cache=shared\"`.\n• Before each test run `prisma migrate deploy` against SQLite, after each run `prisma migrate reset --force`.\n• Write tests:\n  – Creating Student without User should fail.\n  – Deleting Student sets `deletedAt` but Enrollment remains intact (soft-delete path).\n  – Enrolling same student twice in same section violates unique composite index.\n  – Referential cascade: deleting Section (soft) prevents new AttendanceRecords.\n• Add GitHub Actions job that runs `npm test` on PRs.",
+            "status": "done",
+            "testStrategy": "Tests themselves assert integrity; CI badge turns red on regression. Additionally, run `npx prisma migrate diff` between migration history and generated schema to detect drift."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Secure Authentication & Role-Based Access Control (RBAC)",
+        "description": "Implement JWT authentication, refresh tokens, and fine-grained role/permission guards for API and UI routing.",
+        "details": "• Backend: NestJS Passport strategy with bcrypt password hashing, JWT (15 min) + HTTP-only refresh token (7 days). Store refresh tokens hashed in DB.\n• RBAC: NestJS Guard that checks `req.user.role` against route metadata. Map endpoints to roles (e.g., ADMIN can all, TEACHER cannot manage staff, STUDENT limited read, etc.).\n• Frontend: React Context + SWR for auth state. Persist tokens in secure cookies; axios interceptor attaches JWT.\n• Implement `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me` endpoints.\n• Rate-limit login (Redis) and enforce strong password policy.",
+        "testStrategy": "Backend integration tests with Supertest: successful login returns tokens, invalid credentials 401, revoked refresh token 403. FE Cypress: login flow, route protection redirecting unauthenticated users.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Backend Authentication Core: Passport Local & JWT Access Token",
+            "description": "Create NestJS AuthModule with Passport Local strategy for username/password login, bcrypt password hashing, and JWT access token issuance (15-min expiry). Implement /auth/login and /auth/me endpoints.",
+            "dependencies": [],
+            "details": "• Generate AuthModule, AuthService, AuthController.\n• Use bcrypt (10 salt rounds) to hash passwords on user creation (seed script/mock).\n• Configure Passport LocalStrategy to validate credentials via Prisma User model.\n• On successful validation, sign JWT access token containing sub (userId) and role; expiry 15 min; secret from env.\n• Attach user object to request for later guards.\n• /auth/login returns {accessToken, refreshToken} placeholder (refresh handled in subtask 2).\n• /auth/me guarded by JwtAuthGuard returns current user profile.",
+            "status": "done",
+            "testStrategy": "Jest + Supertest: (1) valid credentials → 200 & JWT; (2) invalid password → 401; (3) /auth/me with valid token → 200, without → 401."
+          },
+          {
+            "id": 2,
+            "title": "Refresh Token Lifecycle & Logout",
+            "description": "Add secure refresh token flow: HTTP-only cookie, 7-day expiry, storage as hashed value in DB, rotation and revocation via /auth/refresh & /auth/logout.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Extend User/Session table with hashedRefreshToken, issuedAt.\n• On /auth/login generate random 256-bit refresh token, store bcrypt-hashed version; send as HttpOnly, Secure, SameSite=strict cookie.\n• Implement /auth/refresh: verify cookie, compare hash, issue new access+refresh pair (rotate), update DB.\n• Implement /auth/logout: delete hashed token in DB, clear cookie.\n• Reject reused/old tokens (detect mismatch) with 403.",
+            "status": "done",
+            "testStrategy": "Supertest integration with in-memory DB: (1) login → refresh succeeds → new tokens; (2) altered cookie → 403; (3) logout then refresh → 403."
+          },
+          {
+            "id": 3,
+            "title": "Role-Based Access Control Guard & Decorators",
+            "description": "Create fine-grained RBAC system using custom NestJS Guard that checks route metadata against req.user.role; include Role decorator and centralized role-permission map.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Define enum Role {ADMIN, TEACHER, STUDENT, PARENT}.\n• Create @Roles(...allowed) decorator to set metadata.\n• Implement RolesGuard (extends AuthGuard) reading req.user.role and matching.\n• Register globally or per-route via APP_GUARD.\n• Annotate existing endpoints (e.g., user management ADMIN only).\n• Provide utility hasPermission(role, action) for future granularity.",
+            "status": "done",
+            "testStrategy": "Unit test guard with mocked ExecutionContext for each role; e2e test sample protected route ADMIN passes, STUDENT denied 403."
+          },
+          {
+            "id": 4,
+            "title": "Security Enhancements: Rate Limiting & Password Policy",
+            "description": "Add Redis-backed rate limiter on /auth/login and enforce strong password rules on user registration/reset.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Install @nestjs/throttler with redis store; limit login to 5 req/min/IP, burst 10.\n• Implement ThrottlerGuard for AuthController only.\n• Add password validation util (min 12 chars, upper/lower/number/symbol, no common list) using zxcvbn + class-validator.\n• Return 422 with feedback on weak passwords.",
+            "status": "done",
+            "testStrategy": "Supertest: exceed rate → 429; weak password on registration → 422. Load test with k6 to ensure limiter triggers."
+          },
+          {
+            "id": 5,
+            "title": "Frontend Authentication Context, Token Storage & Route Guards",
+            "description": "Implement React auth layer with Context + SWR, secure cookie handling, axios interceptor, and role-aware routing guards.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "• Create AuthContext providing user, login, logout, refresh.\n• Use SWR `useUser()` hook hitting /auth/me; on 401 redirect to /login.\n• On login, backend sets cookies; front stores nothing in localStorage.\n• axios interceptor reads access token from memory, auto-refresh via /auth/refresh when 401 (queue requests).\n• Create ProtectedRoute component wrapping React-Router, checks user existence & role permissions.\n• Render menu items based on role map from backend.",
+            "status": "done",
+            "testStrategy": "Cypress: (1) successful login sets cookies, redirects dashboard; (2) access protected route unauthenticated → redirected to /login; (3) STUDENT blocked from /admin path. jest-dom unit tests for AuthContext logic."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Reusable UI Component Library & Responsive Layout",
+        "description": "Create design system with reusable components and responsive navigation adhering to WCAG guidelines.",
+        "details": "• Use MUI v6 + Emotion with custom theme (colors, typography). Build atomic components: Button, Input, Select, DatePicker, Table (sortable/filterable/paginated), Modal, Toast, Breadcrumbs.\n• Layout: Sidebar + top bar for desktop, off-canvas drawer for mobile. Implement role-based menu items.\n• Set up Storybook 8 for isolation and visual regression testing (Chromatic).\n• Ensure components have aria labels, focus states, keyboard shortcuts.\n• Export component library as separate package inside mono-repo.",
+        "testStrategy": "Storybook unit and snapshot tests. Use Axe in Storybook CI for accessibility violations. Cypress viewport tests (mobile, tablet, desktop) to verify layout collapses appropriately.",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          3
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Establish MUI v6 + Emotion Theming Infrastructure",
+            "description": "Create the foundational design-system setup that every further component will consume.",
+            "dependencies": [],
+            "details": "• Install @mui/material@next, @mui/system, @emotion/react, @emotion/styled.\n• Define design-tokens in a single src/designSystem/theme.ts (brand palette, semantic colors, typography scale, spacing, elevation, radius, breakpoints).\n• Extend MUI Theme via module augmentation to add custom tokens (e.g., status.warning, sidebarWidth).\n• Configure CssBaseline with color-mode support (light/dark) and integrate GlobalStyles.\n• Export ThemeProvider wrapper (DesignSystemProvider) to be reused by Storybook and application root.\n• Document tokens in a MDX page under /docs for quick reference.",
+            "status": "done",
+            "testStrategy": "Jest snapshot test comparing generated theme object; Storybook docs page renders without console warnings."
+          },
+          {
+            "id": 2,
+            "title": "Implement Accessible Atomic Components",
+            "description": "Build reusable, WCAG-compliant basics: Button, Input, Select, DatePicker.",
+            "dependencies": [],
+            "details": "• Create src/components/atoms with index barrel.\n• For each component, wrap MUI counterpart to inject default variants, sizes, color props from theme.\n• Add aria-labels, focus-visible outline styles, & keyboard-triggered events (e.g., space/enter for button).\n• DatePicker: use @mui/x-date-pickers; localise via AdapterDayjs; ensure screen-reader labels on navigation icons.\n• Export TypeScript props derived from underlying MUI types but renamed to project conventions.\n• Write Storybook stories covering states (hover, disabled, error).",
+            "status": "done",
+            "testStrategy": "React Testing Library: verify role attributes, tab order, keyboard triggers. Storybook a11y addon must show 0 critical issues."
+          },
+          {
+            "id": 3,
+            "title": "Create Complex Molecules & Organisms",
+            "description": "Develop higher-order components: Table (sortable/filterable/paginated), Modal, Toast, Breadcrumbs, all themable and accessible.",
+            "dependencies": [],
+            "details": "• Table: compose MUI DataGrid; add column definition helper; integrate server/client pagination callbacks; include aria-sort on headers.\n• Modal: wrap MUI Dialog; enforce focus trap; add close on ESC; expose imperative open/close hook.\n• Toast: use notistack; create useToast hook; enable severity variants.\n• Breadcrumbs: wrap MUI Breadcrumbs with dynamic route mapping; add aria-label=\"breadcrumb\".\n• Ensure all components emit onChange / onAction events typed with generics for extensibility.\n• Add comprehensive docs & knobs in Storybook.",
+            "status": "done",
+            "testStrategy": "Vitest component tests for table sorting logic; Axe run inside Storybook CI; snapshot tests via Chromatic for visual regression."
+          },
+          {
+            "id": 4,
+            "title": "Implement Responsive Layout & Role-Based Navigation",
+            "description": "Provide application shell: desktop sidebar + topbar, mobile off-canvas drawer, and dynamic menu items based on RBAC.",
+            "dependencies": [],
+            "details": "• Create LayoutContext managing open/close state & breakpoint detection using useMediaQuery(theme.breakpoints).\n• Sidebar: 280px fixed on ≥md, collapses on sm; include logo, menu list rendered from config [{label, icon, path, roles}].\n• TopBar: contains hamburger button (mobile), user avatar with menu.\n• Drawer: MUI Drawer temporary variant; traps focus when open.\n• Integrate with auth context (from Task 3) to filter menu by user.role.\n• Ensure 4:1 contrast on icons/text; provide obvious focus ring for keyboard nav.",
+            "status": "done",
+            "testStrategy": "Cypress viewport tests across breakpoints verifying visibility/toggling; jest-dom unit tests ensuring correct menu items for given roles."
+          },
+          {
+            "id": 5,
+            "title": "Set Up Storybook 8, Chromatic CI & Package Export",
+            "description": "Isolate components, enable visual/a11y regression, and publish library as a versioned package within the mono-repo.",
+            "dependencies": [],
+            "details": "• npx storybook@latest init --builder vite; configure tsconfig paths and DesignSystemProvider decorator.\n• Add @storybook/addon-a11y, addon-interactions, addon-viewport.\n• Configure Chromatic project-token in GitHub Actions to auto-publish PR snapshot builds.\n• Create storybook-static build step in CI pipeline from Task 1.\n• Package export: set up ./packages/ui-library with tsup build generating ESModule + type declarations; use exports field for tree-shaking.\n• Ensure peerDependencies list MUI v6 & Emotion to avoid duplicate bundles.\n• Publish to internal Verdaccio/NPM registry on main branch merge.",
+            "status": "done",
+            "testStrategy": "CI workflow: run build, lint, unit tests; Chromatic must pass visual diffs; attempt yarn add @org/ui-library in example app to confirm components render."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Student Information Management Module",
+        "description": "Build ‘Student 360’ CRUD API, UI screens, and custom field engine.",
+        "details": "Backend:\n• Endpoints: /students (GET list w/ filters, POST create), /students/:id (GET, PATCH, DELETE), /students/:id/custom-fields.\n• Include joins to guardians, enrollment history, medical, emergency contacts.\n• Implement dynamic custom fields table & value storage; enforce data types.\nFrontend:\n• Student List page: searchable table (name, ID, grade, status) with column filters.\n• Student Profile page with tabbed sections (Demographics, Contacts, Medical, Enrollment History, Custom Fields).\n• Modal forms with real-time validation (Yup).\n• Allow ADMIN to configure new custom fields via settings dialog.\nPseudo-code: use React Query `useStudents` hook with debounce search, build `StudentForm` component reusable for create/edit.",
+        "testStrategy": "Backend Jest + Supertest: CRUD endpoints happy & edge cases, custom field validation. FE Cypress: create student, edit, verify data persistence; aXe scan for accessibility. Contract tests with Pact between FE and BE.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design & Migrate Student-Related Database Schema",
+            "description": "Create and migrate relational schema for students, associated entities, and dynamic custom-field storage using Prisma and PostgreSQL.",
+            "dependencies": [],
+            "details": "• Extend existing core schema by adding: Student (id, firstName, lastName, gradeLevel, status, ...), Guardian, StudentGuardian (relationshipType), EnrollmentHistory, MedicalRecord, EmergencyContact.\n• Add CustomFieldDefinition (id, name, dataType, entity=\"STUDENT\", isRequired, createdBy) and CustomFieldValue (id, studentId, fieldDefId, valueText, valueNumber, valueDate, valueBool).\n• Use Prisma MPTT/soft-delete middleware already in project for audit columns.\n• Create SQL indices on (studentId), (gradeLevel,status) for list filters.\n• Generate and apply Prisma migration, update seed script with sample students and custom fields.",
+            "status": "done",
+            "testStrategy": "Run `prisma migrate dev` then unit tests with in-memory sqlite: verify FK constraints, cascading deletes, and that inserting mismatched CustomFieldValue data types is rejected by Prisma validators."
+          },
+          {
+            "id": 2,
+            "title": "Implement Student CRUD REST API Endpoints",
+            "description": "Build NestJS controllers, services, DTOs, and repository layer to expose /students and /students/:id endpoints with filterable list, including joined relational data.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Create StudentService methods: list(filterDto), create(createDto), findOne(id), update(id, patchDto), remove(id).\n• List supports query params: q (search name/ID), grade, status, page, pageSize; construct Prisma where clause; include guardians, enrollmentHistory (last 2 years), medicalRecord summary, emergencyContacts.\n• Use class-validator for DTOs, NestJS Pipes for parsing.\n• Add Swagger decorators for API docs.\n• Wire to global exception filter, return 404/400 appropriately.\n• Pagination metadata via `X-Total-Count` header.",
+            "status": "done",
+            "testStrategy": "Jest + Supertest: happy paths for CRUD, invalid input (blank firstName), pagination boundary, SQL-injection attempt in search, ensure guardians join present in response."
+          },
+          {
+            "id": 3,
+            "title": "Develop Custom Field Engine & Endpoints",
+            "description": "Enable runtime creation of student custom fields and per-student values; enforce data-type validation and expose REST endpoints.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "• Create CustomFieldService: createDefinition(defDto), listDefinitions(), updateDefinition(id), archiveDefinition(id).\n• Write validation utility: map dataType → Zod schema (STRING, NUMBER, DATE, BOOLEAN, ENUM).\n• Endpoints:\n   – POST /custom-fields (ADMIN only)\n   – GET /custom-fields\n   – PATCH /custom-fields/:id\n   – POST /students/:id/custom-fields (bulk upsert values)\n   – GET  /students/:id/custom-fields\n• Store value in corresponding column of CustomFieldValue. Before save, validate value matches definition’s dataType; store ENUM allowedValues JSON in definition.\n• Add Prisma transaction to upsert many values atomically.",
+            "status": "done",
+            "testStrategy": "Unit tests for validator mapping; Supertest: creating definition, attempting to save mismatched value returns 400; regression test for bulk upsert rollback on error."
+          },
+          {
+            "id": 4,
+            "title": "Build Student List UI with Search & Filters",
+            "description": "Create React Student List page featuring server-side pagination, debounced search, and column filters using React Query & Material-UI.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Implement `useStudents` hook (React Query) accepting params {q, grade, status, page} and caching per queryKey.\n• Use lodash.debounce(300ms) on search input.\n• Render MUI DataGrid with columns: Name, ID, Grade, Status, Actions.\n• Persist filter/sort state to URL via React Router search params.\n• Actions column: View, Edit, Delete (opens confirmation dialog).\n• Show skeleton rows while loading, empty state illustration when no results.",
+            "status": "done",
+            "testStrategy": "Cypress e2e: type in search → expect debounced network call; apply grade filter → rows updated; check ARIA roles for accessibility; jest-dom unit test for empty state snapshot."
+          },
+          {
+            "id": 5,
+            "title": "Implement Student Profile & Custom Field Admin UI",
+            "description": "Develop tabbed Student Profile page, reusable StudentForm, and admin dialog to manage custom fields with real-time validation.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "• Create `<StudentProfile>` route `/students/:id` with MUI Tabs: Demographics (StudentForm), Contacts, Medical, Enrollment History, Custom Fields.\n• Build `<StudentForm>` using Formik + Yup; pre-populate on edit, reuse for create (modal from list page).\n• Custom Fields Tab: fetch definitions, render dynamic inputs based on dataType; on submit, call bulk upsert endpoint.\n• Settings gear icon (visible to ADMIN) launches `<CustomFieldDialog>` to add/edit field definitions with live preview and ENUM option builder.\n• Use React Query mutation hooks with optimistic updates and toast notifications.\n• Integrate aXe automated accessibility check in Storybook story.",
+            "status": "done",
+            "testStrategy": "Cypress flow: create student via modal, navigate to profile, add custom boolean & enum fields, verify values persisted and rendered; jest react-testing-library: dynamic form renders correct input type per definition."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Admissions & Enrollment Workflow",
+        "description": "Implement application tracking and enrollment process including homeroom/course assignment.",
+        "details": "• DB: Application table (status enum APPLIED/ACCEPTED/REJECTED) referencing prospective student temp record.\n• API: /applications (list/create/update) with document upload (S3 presigned URLs).\n• Workflow: ADMIN updates status → on ACCEPTED trigger service that converts application to Student entity and opens enrollment form.\n• Enrollment UI wizard: step 1 demographics, step 2 course selection (autocomplete pulling from Course catalogue), step 3 homeroom assignment.\n• Validation: conflict detection for course capacity.\n• Notifications: send acceptance email via SES.\nPseudo-code: `if (application.status === 'ACCEPTED') await prisma.student.create({...})`",
+        "testStrategy": "Unit tests for status transitions, end-to-end Cypress test covering full applicant to enrolled student path, ensuring data integrity (courses enrolled). Mock SES in tests.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend Database & Prisma Models for Admissions and Enrollment",
+            "description": "Add/adjust all schema elements needed to support application tracking, student creation, enrollment records, course capacity, and homeroom assignment.",
+            "dependencies": [],
+            "details": "• Add Application model (id, prospectiveStudentTempId FK, status enum {APPLIED, ACCEPTED, REJECTED}, createdAt, updatedAt, docs JSONB).\n• Ensure existing Student, Course, Section, and Homeroom tables from core schema are compatible; if missing, add Homeroom model (id, name, teacherId FK, capacity).\n• Create Enrollment model (id, studentId FK, courseId FK, homeroomId FK, enrollmentDate).\n• Add CourseCapacity view or course.capacity column + CHECK constraint.\n• Define Prisma enums & relations; run `prisma migrate dev` to generate SQL.\n• Seed demo records (prospective student temp, courses with capacities, homerooms).",
+            "status": "done",
+            "testStrategy": "Use in-memory SQLite with Prisma to assert FK constraints, cascade rules, and that course.capacity > 0. Run seed script and verify counts."
+          },
+          {
+            "id": 2,
+            "title": "Implement /applications REST API with Document Upload",
+            "description": "Create secured endpoints that allow admins to list, create, and update applications, and applicants to upload supporting documents via S3 pre-signed URLs.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Controller routes: GET /applications, POST /applications, PATCH /applications/:id.\n• Use NestJS + Prisma service for CRUD; enforce RBAC (ADMIN full, APPLICANT create/update own).\n• Generate S3 pre-signed URL endpoint: POST /applications/:id/upload-url returns {url, fields}. Store file metadata in Application.docs.\n• Validate status transitions (APPLIED→ACCEPTED|REJECTED) inside service layer.\n• Add pagination, filtering (status, date), and Swagger docs.",
+            "status": "done",
+            "testStrategy": "Jest + Supertest: CRUD happy/edge paths, unauthorized access 403, invalid status 400. Mock AWS SDK to assert pre-signed URL generation."
+          },
+          {
+            "id": 3,
+            "title": "Build Acceptance Workflow Service with Student Creation & SES Notifications",
+            "description": "Automatically convert an accepted application into a Student record, open an enrollment draft, and send an acceptance email.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Implement Prisma middleware or DomainEvent publisher that listens for Application.status change to ACCEPTED.\n• In transaction: `prisma.student.create`, `prisma.enrollment.create({ status:'DRAFT' })`, link to homeroom placeholder (null).\n• Publish `EnrollmentStarted` event containing studentId.\n• Inject AWS SES client; compose email template with enrollment link token.\n• Record email audit log in DB.\n• Ensure idempotency (double ACCEPTED no duplicate students).\n• Environment config for SES region/sender.",
+            "status": "done",
+            "testStrategy": "Unit test workflow with mocked Prisma and SES: assert student count =1, email sent once. Integration test toggling status ACCEPTED via API and verifying DB effects."
+          },
+          {
+            "id": 4,
+            "title": "Develop Enrollment Backend Endpoints with Course Capacity Validation",
+            "description": "Expose APIs consumed by the enrollment wizard to capture demographics, suggest courses, assign homeroom, and block over-capacity selections.",
+            "dependencies": [
+              3
+            ],
+            "details": "• Routes under /enrollments/:studentId\n   ‑ PATCH /demographics\n   ‑ GET /courses?search= (autocomplete, returns open seats)\n   ‑ POST /courses (body: courseId[]) validates capacity via SELECT COUNT(*) < course.capacity.\n   ‑ PATCH /homeroom (assign homeroomId ensuring seats available)\n• Implement single service `EnrollmentService` that encapsulates validation logic and throws custom `CapacityError`.\n• Emit `EnrollmentCompleted` when all steps finished (demographics saved & at least one course enrolled & homeroom set).",
+            "status": "done",
+            "testStrategy": "Jest unit tests for CapacityError scenarios. Supertest integration: enroll into full course returns 409, successful path 200 and DB reflects enrollment."
+          },
+          {
+            "id": 5,
+            "title": "Create React Enrollment Wizard UI & End-to-End Flow",
+            "description": "Frontend wizard that guides accepted students through demographics, course selection with autocomplete, and homeroom assignment, integrating with backend APIs and handling validation errors.",
+            "dependencies": [
+              4
+            ],
+            "details": "• Use React + React-Hook-Form for state management.\n• Step 1 Demographics: prefill from temp record, POST to /demographics.\n• Step 2 Courses: typeahead component using SWR to fetch /courses?search=; display remaining seats; on submit call POST /courses, surface CapacityError.\n• Step 3 Homeroom: dropdown of available homerooms (GET /homerooms?grade=) showing remaining spots.\n• On completion, call PATCH /status=COMPLETED; navigate to confirmation screen.\n• Add loading, error banners, and form validation messages.\n• Internationalize strings (i18n).",
+            "status": "done",
+            "testStrategy": "Cypress E2E: log in as accepted applicant, finish wizard, reload and verify enrollment persisted. Accessibility scan with axe. Mock full course to assert capacity error displayed."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Scheduling Engine (Course Catalog, Master Schedule, Student Scheduling)",
+        "description": "Build tools for course definition, master schedule generation, and automatic student scheduling with conflict detection.",
+        "details": "• Backend: endpoints for Course CRUD, Section (courseId, teacherId, room, term, period). Implement Graph algorithm to detect timetable conflicts (student’s chosen sections overlap).\n• Admin UI: Course Catalog management page; Master Schedule grid with drag-and-drop (react-beautiful-dnd) assigning sections to time blocks.\n• Auto Scheduler service: given student requests, iterate through feasible section combinations using backtracking, return optimal schedule (min gaps).\n• Provide teacher schedule view.\n• Export schedules to PDF (pdfmake).\nPseudo-code conflict check:\n```\nfunction hasConflict(secA, secB){return secA.day===secB.day && secA.start<secB.end && secB.start<secA.end}\n```",
+        "testStrategy": "Algorithm unit tests covering conflict scenarios. Integration test: create course + sections + student enrollment, run Auto Scheduler expect no overlaps. UI Cypress drag-and-drop and print schedule smoke test.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Backend Course & Section CRUD API",
+            "description": "Create PostgreSQL schema, NestJS models, and REST endpoints for managing courses and their offered sections.",
+            "dependencies": [],
+            "details": "• Schema: tables `courses` (id, code, title, credits, term, description) and `sections` (id, course_id FK, teacher_id FK, room, day_of_week, start_time, end_time, term, period).\n• NestJS: use TypeORM entities, DTO validation with class-validator.\n• Endpoints: /courses (GET, POST), /courses/:id (GET, PATCH, DELETE); /sections (GET, POST), /sections/:id (GET, PATCH, DELETE).\n• Include pagination, filtering by term, and eager loading of sections when fetching a course.\n• Seed script with sample data for local testing.\n• Security: protect routes with RBAC guards from Task 3.",
+            "status": "pending",
+            "testStrategy": "Jest + Supertest unit/integration tests covering all CRUD paths, validation failures, and RBAC access rules."
+          },
+          {
+            "id": 2,
+            "title": "Timetable Conflict Detection Service",
+            "description": "Implement reusable graph-based algorithm and REST endpoint to verify whether a given list of section IDs contains time overlaps.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Algorithm: build an interval graph where vertices are section instances and edges represent time overlaps (use provided `hasConflict`).\n• Detect conflicts by checking for any connected components with >1 node on same student list; return boolean and conflicting pairs.\n• Encapsulate in NestJS provider `ScheduleValidatorService`.\n• Endpoint: POST /schedules/validate { sectionIds: number[] } → { isValid: boolean, conflicts: SectionPair[] }.\n• Performance: for large lists, use sweep-line technique instead of O(n²) comparison.",
+            "status": "pending",
+            "testStrategy": "Unit tests with handcrafted overlapping/non-overlapping datasets; property-based tests generating random intervals to ensure no false negatives."
+          },
+          {
+            "id": 3,
+            "title": "Admin UI for Course Catalog & Master Schedule",
+            "description": "Build React pages allowing administrators to manage courses and arrange sections on a drag-and-drop timetable grid.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Tech: React 18 + MUI + react-beautiful-dnd; consume CRUD API via SWR.\n• Course Catalog Page: table listing courses with search, add/edit drawer form.\n• Master Schedule Page: 5×8 grid (days × periods). Sections appear as draggable chips; dropping triggers PATCH to update section day/period.\n• Visual cues for conflicts: after each drop, call /schedules/validate with all sections in that time slot; highlight red if conflict.\n• Use component library from Task 4 for form inputs and table.",
+            "status": "pending",
+            "testStrategy": "Cypress E2E: create course, add section, drag section to grid cell, verify API call, and UI conflict highlight. Visual regression snapshots for grid dragging."
+          },
+          {
+            "id": 4,
+            "title": "Automatic Student Scheduler Service",
+            "description": "Develop backtracking optimizer that assembles a full schedule for each student request set with minimal idle periods, exposed through an API endpoint.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "• Algorithm: recursive backtracking exploring section combinations; prune branches early using conflict validator (from Subtask 2) and current best gap count.\n• Input: list of desired courseIds (and optional preferred teachers/periods).\n• Output: chosen sectionIds, gapCount, unfulfilledCourses[].\n• NestJS microservice `AutoSchedulerService`; configure worker queue (BullMQ + Redis) to process heavy jobs asynchronously.\n• Endpoint: POST /students/:id/schedule/generate; job status polling /jobs/:id.",
+            "status": "pending",
+            "testStrategy": "Unit tests on algorithm with synthetic datasets to ensure gap minimization; integration test creating student & course data, running scheduler, verifying no overlaps and all required courses assigned when possible."
+          },
+          {
+            "id": 5,
+            "title": "Teacher & Student Schedule Views with PDF Export",
+            "description": "Create React pages and backend endpoints allowing users to view their schedules in table format and download them as PDFs.",
+            "dependencies": [
+              1,
+              2,
+              4
+            ],
+            "details": "• Backend: /schedules/:userId (GET) returns consolidated schedule (sections, rooms, times); /schedules/:userId/pdf (GET) streams PDF.\n• PDF generation: use pdfmake; template includes institution logo, day columns, period rows, highlighted lunch blocks.\n• Frontend: TeacherSchedulePage and StudentSchedulePage using responsive grid; button 'Export to PDF' triggers file download.\n• Caching: store generated PDFs for 24 h in S3 or local FS to reduce regeneration.",
+            "status": "pending",
+            "testStrategy": "API tests ensure correct data & PDF MIME type; Cypress tests verifying schedule renders, export downloads valid file; visual diff tests on generated PDF using pdf-snapshot library."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Attendance Tracking Module",
+        "description": "Enable teachers to record daily and period attendance with customizable codes and automated notifications.",
+        "details": "• DB: AttendanceCode, AttendanceRecord (studentId, sectionId?, date, codeId, recordedBy).\n• API: `/attendance/daily`, `/attendance/period`, `/attendance/reports`.\n• UI: Teacher dashboard card opens attendance sheet list view with selectable codes via keyboard shortcuts (1=P,2=A etc.).\n• Admin settings page to manage attendance codes.\n• Notification Service: CRON at 3 PM checks for Unexcused Absence → send push/email to guardian.\n• Add filters by date range, code in Attendance Reports.",
+        "testStrategy": "Backend tests: record attendance idempotency, report aggregation accuracy. FE Cypress: mark attendance, reload ensure persistence. Mock notification gateway and assert emails queued.",
+        "priority": "medium",
+        "dependencies": [
+          5,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Attendance DB Schema & Migrations",
+            "description": "Design and migrate database tables needed for attendance tracking, ensuring data integrity and performance.",
+            "dependencies": [],
+            "details": "• Use ORM migrations (e.g., TypeORM) to add AttendanceCode(id, code, description, isExcused boolean, sortOrder) and AttendanceRecord(id, studentId FK, sectionId FK NULL, date DATE, period INT NULL, codeId FK, recordedBy FK, createdAt, updatedAt).\n• Add composite unique index on (studentId, date, period) to enforce idempotent recording.\n• Create foreign-key constraints to Student, Section, User tables.\n• Seed common codes (P=Present, A=Absent, U=Unexcused, T=Tardy) in initial migration.\n• Include up/down scripts and generate SQL for review.",
+            "status": "pending",
+            "testStrategy": "Run migration in test DB, verify tables & indexes exist. Insert duplicate student/date/period rows to ensure constraint blocks duplicates."
+          },
+          {
+            "id": 2,
+            "title": "Implement Attendance Code Management (Admin)",
+            "description": "Provide CRUD API and UI for administrators to manage attendance codes used by teachers.",
+            "dependencies": [
+              1
+            ],
+            "details": "Backend:\n• REST endpoints: GET /attendance/codes, POST, PATCH/:id, DELETE/:id guarded by ADMIN role.\n• Validate uniqueness of code string.\nFrontend:\n• Add \"Attendance Codes\" page under Admin settings.\n• Table view with inline edit, drag-drop sort (sortOrder field), delete with confirmation.\n• Use optimistic UI updates via SWR.\n• RBAC guard to restrict to admins.\n\nBusiness Rules:\n• Prevent deletion of codes referenced by AttendanceRecord; instead offer ‘disable’ toggle.\n• Mark one code as default ‘Present’.",
+            "status": "pending",
+            "testStrategy": "Jest service tests for validation rules; Supertest for endpoint auth. Cypress admin flow: create new code, edit description, disable, ensure reflected in teacher UI."
+          },
+          {
+            "id": 3,
+            "title": "Build Attendance Recording APIs & Services",
+            "description": "Expose daily and period attendance endpoints with idempotent upsert logic and validation against codes.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "• Service layer method recordAttendance({studentId, sectionId, date, period?, codeId, recordedBy}) performs upsert using unique index.\n• Endpoints:\n  - POST /attendance/daily {sectionId, date, records:[{studentId, code}]}\n  - POST /attendance/period {sectionId, date, period, records:[...]}.\n• Bulk save in transaction for speed; return updated records.\n• Enforce teacher can only record for sections they teach (via RBAC guard).\n• Normalize keyboard codes mapping (1=P,2=A,3=U,4=T) in service for later UI use.\n• Emit domain event AttendanceRecorded for downstream consumers (notifications, analytics).",
+            "status": "pending",
+            "testStrategy": "Unit tests: upsert returns same id on duplicate call, validation rejects unknown codeId. Integration tests with Supertest for bulk insert, permission denial, and event emission spy."
+          },
+          {
+            "id": 4,
+            "title": "Develop Teacher Dashboard Attendance UI",
+            "description": "Create attendance sheet interface allowing quick marking with keyboard shortcuts and persisting via APIs.",
+            "dependencies": [
+              3
+            ],
+            "details": "• React component on dashboard card opens modal/page listing students of selected section.\n• Fetch codes from /attendance/codes and map keys (1-9) to buttons; display legend.\n• Implement roster table with arrow key navigation; pressing numeric key posts record via /attendance/daily or /period depending on period selector.\n• Optimistically update cell color/status; handle API error rollback.\n• Persist selected date/period in URL query for reload persistence.\n• Add ‘Submit’ action that batches unsent changes.\n• Use SWR mutate after successful post to keep cache fresh.",
+            "status": "pending",
+            "testStrategy": "Cypress tests: mark present for first 3 students using keys 1, then reload page and verify state saved. Accessibility test for keyboard-only navigation."
+          },
+          {
+            "id": 5,
+            "title": "Automated Absence Notifications & Report Filters",
+            "description": "Send daily guardian notifications for unexcused absences and enhance reports endpoint with filter capabilities.",
+            "dependencies": [
+              3
+            ],
+            "details": "Notification Service:\n• CRON job (node-cron or Bull repeatable job) at 15:00 server time.\n• Query AttendanceRecord for current date where code.isExcused = false.\n• Join Student -> Guardian contacts; push message onto NotificationQueue (email + push).\n• Mark AttendanceRecord.notifiedAt to prevent duplicates.\n\nReports Enhancement:\n• Extend GET /attendance/reports?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&codeIds=1,3 to filter records.\n• Aggregate counts by student, section, date; return CSV or JSON based on Accept header.\n• Secure with RBAC (TEACHER gets own sections, ADMIN all).\n• Optimize query with covering index on (date, codeId).\n• Documentation via OpenAPI annotations.",
+            "status": "pending",
+            "testStrategy": "Unit test cron query selects only unnotified absences. Integration test mocks notification gateway and asserts messages queued. Supertest for /attendance/reports with date range returns correct totals. Verify notifiedAt set after job run."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Gradebook & GPA Calculation",
+        "description": "Provide assignment management, weighted gradebook, report cards, and GPA engine.",
+        "details": "• DB: Assignment (type, maxPoints, dueDate, weight), Grade (assignmentId, studentId, points, letter).\n• API endpoints: /assignments, /grades, /report-cards, /gpa.\n• GPA service: configurable scale (4.0, 5.0). Query completed courses, compute quality points = gradeValue * creditHours.\n• UI: Teacher Gradebook grid (react-data-grid) with inline edit, autosave.\n• Weighted calculation: group by category weight → finalCourseGrade.\n• PDF report card generator per grading period.\nPseudo-code GPA:\n```\nconst qPoints = courses.reduce((t,c)=>t+gradeToPoints(c.grade)*c.credits,0);\nreturn qPoints/totalCredits;\n```",
+        "testStrategy": "Unit tests for weighted grade calculations and GPA rounding. Integration test: create assignments/grades, generate report card PDF checksum. UI Cypress: teacher enters grades, student portal displays updated GPA.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3,
+          5,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Assignment & Grade Database Schema and Migrations",
+            "description": "Design and implement the Prisma models, relationships, and migrations for Assignment and Grade tables supporting weighted grading and letter/points storage.",
+            "dependencies": [],
+            "details": "• Extend existing Prisma schema with models: Assignment(id UUID, courseId FK, type ENUM('HW','Quiz','Exam','Project'), maxPoints Int, dueDate DateTime, weight Decimal(5,2), createdAt, updatedAt)\n• Grade(id UUID, assignmentId FK, studentId FK, points Decimal(6,2), letter String? (A–F), createdAt, updatedAt)\n• Add composite unique index (assignmentId, studentId) to avoid duplicates.\n• Run `prisma migrate dev` to generate SQL for PostgreSQL.\n• Seed script: create sample assignments for each course and random grades for test students to aid later subtasks.",
+            "status": "pending",
+            "testStrategy": "Use an in-memory SQLite instance to run Prisma unit tests asserting schema, indexes, FK constraints, and seed data row counts."
+          },
+          {
+            "id": 2,
+            "title": "Implement Assignment & Grade REST API Endpoints",
+            "description": "Expose CRUD operations and course gradebook retrieval over REST with validation, pagination, and RBAC guards.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Endpoints: POST/GET/PATCH/DELETE /assignments, /grades; GET /gradebooks/:courseId returns grid of students × assignments with points & letter.\n• Use Express + zod for request validation; JWT middleware to permit TEACHER role mutating actions.\n• Service layer functions: createAssignment, listAssignments(filter), upsertGrade(batch), fetchCourseGradebook.\n• For autosave support accept grade PATCH with {points, letter} body and return updated GPA stub field for eventual UI optimisations.",
+            "status": "pending",
+            "testStrategy": "Jest supertest: create assignment, add grades, fetch gradebook; assert 200 and schema validity, unauthorized user receives 403."
+          },
+          {
+            "id": 3,
+            "title": "Build React Teacher Gradebook Grid with Inline Edit & Autosave",
+            "description": "Create a front-end grid allowing teachers to view and edit student grades, autosaving changes via debounced API calls.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Use react-data-grid for table; columns = assignments, rows = enrolled students.\n• Cell renderer toggles between display/input; onBlur or 500 ms debounce triggers PATCH /grades.\n• Show toast on save success/failure; optimistic UI update with rollback on error.\n• Implement virtual scrolling for courses >100 students.\n• Reuse component library (Task 4) theme; add keyboard shortcuts (arrow move, Enter edit).",
+            "status": "pending",
+            "testStrategy": "Cypress: type new grade, wait for autosave, reload page, confirm persisted. Storybook interaction test for cell editing state."
+          },
+          {
+            "id": 4,
+            "title": "Develop Weighted Grade and GPA Calculation Service",
+            "description": "Create reusable functions and /gpa endpoint to compute final course grades by category weight and cumulative GPA using configurable 4.0/5.0 scales.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Weighted grade: group grades by Assignment.type, compute (sum(points/maxPoints) * weight) per category, sum to finalCourseGrade.\n• GPA: fetch completed courses with creditHours + final letter grade; map letter→points via scale table; formula = Σ(gradePoints*creditHours)/Σ(creditHours).\n• Config: store scale in DB table or env JSON; allow ?scale=5 parameter.\n• Add caching layer (Redis) keyed by studentId+period for 15 min.\n• Validate edge cases: pass/fail, incompletes excluded.",
+            "status": "pending",
+            "testStrategy": "Unit tests: mock assignments/grades to verify weighted calculation accuracy to 0.01; GPA rounding to 2 decimals; integration test hitting /gpa with seeded data."
+          },
+          {
+            "id": 5,
+            "title": "Generate PDF Report Cards per Grading Period",
+            "description": "Produce downloadable PDFs summarizing student course grades, GPA, and teacher comments for a given term.",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "• Endpoint GET /report-cards?studentId&term=2024Q1 returns PDF buffer.\n• Server: use Puppeteer to render HTML template → PDF; template pulls finalCourseGrade (Service 4), term GPA, attendance summary placeholder.\n• Layout: school logo header, table of courses (grade, %), footer with signature lines.\n• Store generated files in S3, return presigned URL; background job queues heavy rendering via BullMQ.\n• Add i18n for locale-based date formats.",
+            "status": "pending",
+            "testStrategy": "Integration test: seed student data, call endpoint, assert 200 with application/pdf; checksum vs fixture for template regressions; visual regression using pdf-diff on CI."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Reporting & Analytics Framework",
+        "description": "Deliver standard reports, data export, and foundation for future custom report builder.",
+        "details": "• Implement generic report service that accepts SQL templates with parameter binding.\n• Pre-build reports: Student Roster, Attendance Summary, Grade Distribution, Demographic Breakdown.\n• API: /reports?type=attendance&period=2024Q1&format=csv|pdf.\n• Use Chart.js for on-screen visualisations (bar, pie).\n• Data export via streaming CSV; server-side PDF with Puppeteer.\n• Add RBAC guard ensuring only authorised roles can access certain reports.\n• Log report executions for audit.",
+        "testStrategy": "Snapshot test SQL templates produce expected columns. Download CSV and compare row counts. Cypress: generate attendance report, verify chart renders. Pen-test export endpoints against SQL injection using OWASP ZAP.",
+        "priority": "low",
+        "dependencies": [
+          5,
+          7,
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Develop Generic SQL-Template Report Engine",
+            "description": "Create a reusable backend service capable of executing parameterised SQL templates, returning strongly-typed result sets and metadata that downstream exporters (CSV, PDF, JSON) can consume.",
+            "dependencies": [],
+            "details": "• Stack: NestJS provider called ReportEngineService.\n• Accepts: {templateId, params, outputMode} where outputMode = \"raw\" | \"stream\".\n• Template storage: keep SQL files in /reports/sql or a DB table with columns (id, name, sql, allowedRoles).\n• Use pg-format or pg-promise named-parameters for safe binding; forbid string concatenation.\n• Stream results with node-pg cursor for large datasets.\n• Return {columns, rows, rowStream} so callers can choose buffered or stream mode.\n• Include defensive guards: validate params, check for missing/extra placeholders, enforce max date range.\n• Populate initial templates for Student Roster, Attendance Summary, Grade Distribution, Demographic Breakdown.\n• Provide unit helpers to register new templates, easing future custom report builder work.",
+            "status": "pending",
+            "testStrategy": "Jest unit tests: (1) Execute each seed template with mock pg client ⇒ expect correct columns; (2) Parameter binding rejects invalid SQL injection attempts; (3) Cursor returns all rows when streamed."
+          },
+          {
+            "id": 2,
+            "title": "Expose /reports API with RBAC Guard & Audit Logging",
+            "description": "Implement REST endpoint that routes requests to the Report Engine, enforces role-based access, and writes execution logs for auditing.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Controller: GET /reports.\n• Query params: type (templateId), format (json|csv|pdf), plus dynamic params (period, sectionId, etc.).\n• RBAC: Use existing AuthGuard + new ReportRoleGuard that pulls allowedRoles from template registry and matches req.user.role.\n• Inject ReportEngineService to fetch data.\n• Audit: create ReportExecution entity (id, userId, templateId, params, executedAt, durationMs, rowCount) and save via TypeORM.\n• Response modes: if format=json → return JSON payload (columns + rows) for visualisation; csv/pdf delegated to subsequent subtasks.\n• Validate and sanitise query params; return 400 for unknown templateId.",
+            "status": "pending",
+            "testStrategy": "Supertest integration: (1) ADMIN can fetch attendance JSON; TEACHER denied if not authorised; (2) Execution logged; (3) Unknown template ⇒ 400."
+          },
+          {
+            "id": 3,
+            "title": "Implement Streaming CSV Export",
+            "description": "Provide memory-efficient CSV generation for large datasets, wiring it into the /reports endpoint when format=csv.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Use fast-csv or csv-stringify to transform ReportEngineService rowStream into CSV.\n• Set response headers: Content-Disposition: attachment; filename=<templateId>_<timestamp>.csv.\n• Pipe database cursor → transform → res to stream directly, minimising RAM.\n• Include column header row.\n• Handle back-pressure and connection aborts gracefully.\n• Update audit log with byteSize.\n• Document in API spec.",
+            "status": "pending",
+            "testStrategy": "Integration test: request CSV for Student Roster (10k rows) ⇒ stream finishes, row count matches query. Use `wget` or Supertest with `end` handler to assert header presence."
+          },
+          {
+            "id": 4,
+            "title": "Generate PDF Reports with Puppeteer",
+            "description": "Render server-side HTML templates (including optional Chart.js via node-canvas) and convert them to PDF when format=pdf is requested.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Build handlebars/ejs HTML templates per report, embedding data table and optional chart placeholders.\n• Use Chart.js + chartjs-node-canvas to generate static images for charts in server context.\n• Launch headless Chromium via Puppeteer; load HTML string via `about:blank`; set page media to print; call `page.pdf()` with A4 landscape.\n• Stream resulting PDF as response with proper headers.\n• Cache compiled templates to improve performance.\n• Implement retry/back-off in case Chromium crashes.\n• Record pageCount and fileSize in audit log.",
+            "status": "pending",
+            "testStrategy": "Automated: jest-puppeteer to generate Grade Distribution PDF and verify file opens and contains expected text using pdf-parse. Manual: open PDF to ensure charts render."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Chart.js Visualisations in Frontend UI",
+            "description": "Create React pages that fetch JSON report data and render interactive bar/pie charts for supported reports, providing users with export controls.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Route: /reports/:type.\n• SWR fetcher calls /reports?type=<>&format=json with auth token.\n• Build ReportViewer component: table (MUI DataGrid) + ChartPanel.\n• Use Chart.js 4 via react-chartjs-2; map Attendance Summary to bar chart, Grade Distribution to pie, etc.\n• Provide export buttons: `Download CSV` (link to /reports?format=csv) and `Download PDF` (same for pdf).\n• Handle loading/error states, param filters (period selector, section dropdown).\n• Add a11y: ARIA labels, colour-blind palette.\n• Lazy-load charts to reduce bundle size.",
+            "status": "pending",
+            "testStrategy": "Cypress e2e: login as teacher, open Attendance Summary page, assert chart canvas exists, export CSV and compare row count. Axe accessibility scan passes."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-05T07:27:53.608Z",
+      "updated": "2025-08-05T09:44:27.744Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

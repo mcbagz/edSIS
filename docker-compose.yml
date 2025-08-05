@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for SIS Application
+  sis-postgres:
+    image: postgres:15-alpine
+    container_name: sis-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-sis_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - sis-postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - sis-network
+      - edfi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SIS Backend API
+  sis-backend:
+    build:
+      context: ./sis-backend
+      dockerfile: Dockerfile
+    container_name: sis-backend
+    depends_on:
+      sis-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@sis-postgres:5432/${POSTGRES_DB:-sis_db}
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_here_change_in_production}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      # AWS Configuration (optional)
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-sis-application-documents}
+      AWS_SES_FROM_EMAIL: ${AWS_SES_FROM_EMAIL:-noreply@yourschool.edu}
+      # Ed-Fi Configuration
+      EDFI_API_BASE_URL: ${EDFI_API_BASE_URL:-http://ed-fi-api:80}
+      EDFI_API_CLIENT_ID: ${EDFI_API_CLIENT_ID:-}
+      EDFI_API_CLIENT_SECRET: ${EDFI_API_CLIENT_SECRET:-}
+      # Frontend URL
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./sis-backend:/app
+      - /app/node_modules
+    networks:
+      - sis-network
+      - edfi-network
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        npm run prisma:generate &&
+        npm run prisma:migrate deploy &&
+        npm run prisma:seed &&
+        npm start
+      "
+
+  # SIS Frontend
+  sis-frontend:
+    build:
+      context: ./sis-app
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+    container_name: sis-frontend
+    depends_on:
+      - sis-backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+    ports:
+      - "80:80"
+    networks:
+      - sis-network
+
+  # Ed-Fi Sync Service (handles data synchronization)
+  edfi-sync:
+    build:
+      context: ./edfi-sync
+      dockerfile: Dockerfile
+    container_name: edfi-sync
+    depends_on:
+      - sis-backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@sis-postgres:5432/${POSTGRES_DB:-sis_db}
+      EDFI_API_BASE_URL: ${EDFI_API_BASE_URL:-http://ed-fi-api:80}
+      EDFI_API_CLIENT_ID: ${EDFI_API_CLIENT_ID:-}
+      EDFI_API_CLIENT_SECRET: ${EDFI_API_CLIENT_SECRET:-}
+      SYNC_INTERVAL: ${SYNC_INTERVAL:-300000} # 5 minutes
+    networks:
+      - sis-network
+      - edfi-network
+    restart: unless-stopped
+
+  # PgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sis-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@school.edu}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+    ports:
+      - "5050:80"
+    networks:
+      - sis-network
+    depends_on:
+      - sis-postgres
+    profiles:
+      - dev
+
+volumes:
+  sis-postgres-data:
+
+networks:
+  sis-network:
+    driver: bridge
+  # Assume Ed-Fi is running in its own docker network
+  edfi-network:
+    external: true
+    name: ed-fi-docker-compose_default

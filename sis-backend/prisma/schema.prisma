@@ -1,0 +1,415 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  APPLIED
+  ACCEPTED
+  REJECTED
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  PARENT
+  STUDENT
+}
+
+model User {
+  id              String          @id @default(uuid())
+  email           String          @unique
+  password        String
+  role            UserRole
+  firstName       String
+  lastName        String
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  staff           Staff?
+  student         Student?
+  parent          Parent?
+}
+
+model ProspectiveStudent {
+  id              String          @id @default(uuid())
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime
+  gender          String?
+  ethnicity       String?
+  email           String?
+  phone           String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  guardianName    String
+  guardianEmail   String
+  guardianPhone   String
+  guardianRelation String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  application     Application?
+}
+
+model Application {
+  id                      String              @id @default(uuid())
+  prospectiveStudentId    String              @unique
+  status                  ApplicationStatus   @default(APPLIED)
+  applicationDate         DateTime            @default(now())
+  documents               Json?               // Store document metadata as JSON
+  notes                   String?
+  reviewedBy              String?
+  reviewedAt              DateTime?
+  acceptanceEmailSent     Boolean             @default(false)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  
+  prospectiveStudent      ProspectiveStudent  @relation(fields: [prospectiveStudentId], references: [id])
+}
+
+model Student {
+  id                  String              @id @default(uuid())
+  userId              String?             @unique
+  studentUniqueId     String              @unique // Ed-Fi studentUniqueId
+  firstName           String
+  lastName            String
+  middleName          String?
+  birthDate           DateTime
+  gender              String?
+  ethnicity           String?
+  gradeLevel          String
+  enrollmentDate      DateTime            @default(now())
+  enrollmentStatus    String              @default("Active")
+  email               String?
+  phone               String?
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  
+  // Emergency Contact Info
+  emergencyContactName      String?
+  emergencyContactPhone     String?
+  emergencyContactRelation  String?
+  
+  // Medical Info
+  medicalConditions   String?
+  medications         String?
+  allergies           String?
+  emergencyMedicalInstructions String?
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  user                User?               @relation(fields: [userId], references: [id])
+  enrollments         Enrollment[]
+  studentParents      StudentParent[]
+  attendances         Attendance[]
+  grades              Grade[]
+  disciplineIncidents StudentDisciplineIncident[]
+}
+
+model Parent {
+  id              String          @id @default(uuid())
+  userId          String          @unique
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id])
+  studentParents  StudentParent[]
+}
+
+model StudentParent {
+  id              String          @id @default(uuid())
+  studentId       String
+  parentId        String
+  relationship    String          // mother, father, guardian, etc.
+  isPrimary       Boolean         @default(false)
+  hasLegalCustody Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  student         Student         @relation(fields: [studentId], references: [id])
+  parent          Parent          @relation(fields: [parentId], references: [id])
+  
+  @@unique([studentId, parentId])
+}
+
+model Staff {
+  id                  String              @id @default(uuid())
+  userId              String              @unique
+  staffUniqueId       String              @unique // Ed-Fi staffUniqueId
+  firstName           String
+  lastName            String
+  middleName          String?
+  email               String
+  phone               String?
+  position            String
+  department          String?
+  hireDate            DateTime
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  user                User                @relation(fields: [userId], references: [id])
+  homerooms           Homeroom[]
+  courseSections      CourseSection[]
+}
+
+model School {
+  id                  String              @id @default(uuid())
+  schoolId            Int                 @unique // Ed-Fi schoolId
+  name                String
+  type                String              // Elementary, Middle, High
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  phone               String?
+  principal           String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  homerooms           Homeroom[]
+  courses             Course[]
+  courseSections      CourseSection[]
+  sessions            Session[]
+  gradingPeriods      GradingPeriod[]
+}
+
+model Session {
+  id                  String              @id @default(uuid())
+  schoolId            String
+  name                String              // Fall 2024, Spring 2025, etc.
+  beginDate           DateTime
+  endDate             DateTime
+  totalInstructionalDays Int
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  school              School              @relation(fields: [schoolId], references: [id])
+  gradingPeriods      GradingPeriod[]
+  courseSections      CourseSection[]
+}
+
+model GradingPeriod {
+  id                  String              @id @default(uuid())
+  sessionId           String
+  schoolId            String
+  name                String              // Quarter 1, Semester 1, etc.
+  beginDate           DateTime
+  endDate             DateTime
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  session             Session             @relation(fields: [sessionId], references: [id])
+  school              School              @relation(fields: [schoolId], references: [id])
+  grades              Grade[]
+}
+
+model Homeroom {
+  id                  String              @id @default(uuid())
+  schoolId            String
+  name                String
+  teacherId           String
+  roomNumber          String?
+  capacity            Int
+  gradeLevel          String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  school              School              @relation(fields: [schoolId], references: [id])
+  teacher             Staff               @relation(fields: [teacherId], references: [id])
+  enrollments         Enrollment[]
+}
+
+model Course {
+  id                  String              @id @default(uuid())
+  schoolId            String
+  courseCode          String              @unique
+  name                String
+  description         String?
+  credits             Float               @default(1.0)
+  department          String?
+  gradeLevel          String[]            // Can be offered to multiple grade levels
+  prerequisites       String[]            // Array of course codes
+  capacity            Int?                // Maximum students per section
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  school              School              @relation(fields: [schoolId], references: [id])
+  courseSections      CourseSection[]
+}
+
+model CourseSection {
+  id                  String              @id @default(uuid())
+  courseId            String
+  schoolId            String
+  sessionId           String
+  sectionIdentifier   String              // e.g., "A", "B", "01", "02"
+  teacherId           String
+  roomNumber          String?
+  period              String?             // 1st Period, 2nd Period, etc.
+  time                String?             // "8:00 AM - 8:50 AM"
+  days                String[]            // ["M", "W", "F"] or ["T", "Th"]
+  maxStudents         Int
+  currentEnrollment   Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  course              Course              @relation(fields: [courseId], references: [id])
+  school              School              @relation(fields: [schoolId], references: [id])
+  session             Session             @relation(fields: [sessionId], references: [id])
+  teacher             Staff               @relation(fields: [teacherId], references: [id])
+  enrollments         Enrollment[]
+  attendances         Attendance[]
+  assignments         Assignment[]
+  grades              Grade[]
+  
+  @@unique([courseId, sessionId, sectionIdentifier])
+}
+
+model Enrollment {
+  id                  String              @id @default(uuid())
+  studentId           String
+  courseSectionId     String?
+  homeroomId          String?
+  enrollmentDate      DateTime            @default(now())
+  exitDate            DateTime?
+  status              String              @default("Active") // Active, Dropped, Completed
+  grade               String?             // Final grade if completed
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  student             Student             @relation(fields: [studentId], references: [id])
+  courseSection       CourseSection?      @relation(fields: [courseSectionId], references: [id])
+  homeroom            Homeroom?           @relation(fields: [homeroomId], references: [id])
+  
+  @@unique([studentId, courseSectionId])
+  @@index([studentId, homeroomId])
+}
+
+model Attendance {
+  id                  String              @id @default(uuid())
+  studentId           String
+  courseSectionId     String?
+  date                DateTime
+  attendanceCode      String              // Present, Absent, Tardy, Excused
+  minutes             Int?                // Minutes present/absent
+  notes               String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  student             Student             @relation(fields: [studentId], references: [id])
+  courseSection       CourseSection?      @relation(fields: [courseSectionId], references: [id])
+  
+  @@unique([studentId, courseSectionId, date])
+  @@index([studentId, date])
+}
+
+model Assignment {
+  id                  String              @id @default(uuid())
+  courseSectionId     String
+  title               String
+  description         String?
+  type                String              // Homework, Quiz, Test, Project
+  dueDate             DateTime
+  maxPoints           Float
+  weight              Float               @default(1.0)
+  category            String              // Tests, Quizzes, Homework, Participation
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  courseSection       CourseSection       @relation(fields: [courseSectionId], references: [id])
+  grades              Grade[]
+}
+
+model Grade {
+  id                  String              @id @default(uuid())
+  studentId           String
+  courseSectionId     String
+  assignmentId        String?
+  gradingPeriodId     String?
+  gradeType           String              // Assignment, Final, Quarter, Semester
+  numericGrade        Float?
+  letterGrade         String?
+  points              Float?
+  comment             String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  student             Student             @relation(fields: [studentId], references: [id])
+  courseSection       CourseSection       @relation(fields: [courseSectionId], references: [id])
+  assignment          Assignment?         @relation(fields: [assignmentId], references: [id])
+  gradingPeriod       GradingPeriod?      @relation(fields: [gradingPeriodId], references: [id])
+  
+  @@unique([studentId, courseSectionId, assignmentId])
+  @@index([studentId, courseSectionId, gradingPeriodId])
+}
+
+model DisciplineIncident {
+  id                      String                      @id @default(uuid())
+  incidentIdentifier      String                      @unique
+  incidentDate            DateTime
+  incidentTime            String?
+  incidentLocation        String?
+  reporterName            String?
+  reporterDescription     String?
+  behaviorCode            String                      // Tardy, Disruption, Fighting, etc.
+  incidentDescription     String
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+  
+  studentIncidents        StudentDisciplineIncident[]
+  disciplineActions       DisciplineAction[]
+}
+
+model StudentDisciplineIncident {
+  id                  String              @id @default(uuid())
+  studentId           String
+  incidentId          String
+  studentRole         String              // Perpetrator, Victim, Witness
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  student             Student             @relation(fields: [studentId], references: [id])
+  incident            DisciplineIncident  @relation(fields: [incidentId], references: [id])
+  
+  @@unique([studentId, incidentId])
+}
+
+model DisciplineAction {
+  id                  String              @id @default(uuid())
+  incidentId          String
+  actionType          String              // Detention, Suspension, Counseling, Warning
+  actionDate          DateTime
+  duration            String?             // "3 days", "1 week", etc.
+  description         String?
+  assignedBy          String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  incident            DisciplineIncident  @relation(fields: [incidentId], references: [id])
+}

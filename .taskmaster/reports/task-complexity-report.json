@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-05T07:33:52.802Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Project Repository & Environment Setup",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Decompose the repository and environment setup into granular engineering tasks that cover: 1) mono-repo scaffolding, 2) local containerisation, 3) shared developer tooling, 4) CI build/test/lint, 5) CD/deployment automation, and 6) monitoring/observability bootstrap. For each, specify goals, acceptance criteria, dependencies, and estimated effort.",
+			"reasoning": "Requires multi-stack orchestration (frontend, backend, infra, CI/CD) but follows standard patterns; moderate architectural risk."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Design & Implement Core Database Schema",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break the core data-model effort into: 1) entity modelling & ERD validation, 2) Prisma schema authoring, 3) auditing & soft-delete middleware, 4) migration generation/verification, 5) seed data & reference tables, 6) performance indexing & constraints review, and 7) automated schema regression tests.",
+			"reasoning": "Touches a wide domain surface with complex relationships, soft deletes, and future extensibility; high impact on downstream modules."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Secure Authentication & Role-Based Access Control (RBAC)",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Divide authentication/RBAC into: 1) password hashing & local login, 2) JWT access tokens, 3) refresh-token lifecycle, 4) RBAC guards/decorators, 5) security hardening (rate-limit, password policy), and 6) frontend auth context & route protection. Detail interfaces, security considerations, and test plans.",
+			"reasoning": "Security-sensitive work spanning backend and frontend, token management, and fine-grained RBAC; needs rigorous testing and hardening."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Reusable UI Component Library & Responsive Layout",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Expand the design-system task into: 1) theming infrastructure, 2) atomic components, 3) complex molecules/organisms, 4) responsive layout & navigation, 5) Storybook + visual/a11y testing, and 6) packaging & publishing workflow. Provide component acceptance criteria and accessibility guidelines for each.",
+			"reasoning": "Mostly front-end work with known tooling; complexity lies in design consistency, accessibility, and CI visual testing."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Student Information Management Module",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Structure the Student 360 module into: 1) database extensions for student entities, 2) core CRUD APIs, 3) custom-field engine, 4) list page with filters, 5) profile page with tabs, 6) dynamic form components, 7) admin tooling for custom fields, and 8) contract/integration/end-to-end testing. Capture data-validation rules and performance expectations.",
+			"reasoning": "Combines complex domain logic, dynamic schemas, rich UI, and deep integration with auth and component library; critical path feature."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Admissions & Enrollment Workflow",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break admissions/enrollment into: 1) schema extensions (applications, homerooms, enrollment), 2) application CRUD with document uploads, 3) acceptance automation (student creation + email), 4) enrollment API with capacity validation, 5) frontend wizard, and 6) notification & audit logging. Define state-machine transitions and rollback strategies.",
+			"reasoning": "Introduces asynchronous workflows, document handling, and multi-step UI; moderate algorithmic complexity and external integrations."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Scheduling Engine (Course Catalog, Master Schedule, Student Scheduling)",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Partition scheduling into: 1) course & section CRUD backend, 2) conflict-detection service, 3) admin UI for catalog & grid, 4) auto-scheduler algorithm & queue worker, 5) schedule validation & persistence, 6) teacher/student schedule views with PDF export, and 7) scalability/performance profiling. Specify algorithm requirements and UI interaction flows.",
+			"reasoning": "Mixes algorithmic optimisation, complex UI drag-and-drop, and PDF generation; higher cognitive load and coordination needs."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Attendance Tracking Module",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Segment attendance tracking into: 1) DB schema & migrations, 2) code management (admin), 3) recording APIs with idempotency, 4) teacher dashboard UI, 5) absence notification service, and 6) reporting/analytics endpoints. Include keyboard UX specs and notification scheduling details.",
+			"reasoning": "Requires real-time data entry UX, batch APIs, scheduled jobs, and reporting; standard patterns but multiple moving parts."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Gradebook & GPA Calculation",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Decompose gradebook into: 1) assignment & grade schema, 2) assignment/grade APIs, 3) teacher gradebook grid UI with autosave, 4) weighted grade calculation service, 5) GPA computation & caching, 6) PDF report-card generation, and 7) data integrity & concurrency tests. Outline grading scale configurability and rounding rules.",
+			"reasoning": "Combines real-time grid editing, complex calculations, PDF output, and consistency requirements across large datasets."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Reporting & Analytics Framework",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Expand analytics framework into: 1) generic SQL-template engine, 2) secured /reports API with audit logging, 3) streaming CSV exporter, 4) server-side PDF generator with charts, 5) frontend visualisation pages, and 6) report template governance & documentation. Detail parameter binding, RBAC mapping, and performance safeguards.",
+			"reasoning": "Leverages existing data; complexity stems from safe SQL templating, large-data streaming, and multi-format exports rather than novel algorithms."
+		}
+	]
+}
