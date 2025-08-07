@@ -14,6 +14,16 @@ import {
   Avatar,
   Chip,
   Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  IconButton,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -28,8 +38,17 @@ import {
   LocationOn,
   Phone,
   Email,
+  Warning,
+  MedicalServices,
+  Medication,
+  Save,
+  Cancel,
+  Home,
+  Class,
+  Assessment,
+  EventAvailable,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentService } from '../../services/studentService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button, Breadcrumbs, useToast } from '../../components';
@@ -70,7 +89,21 @@ export const StudentProfile: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [tabValue, setTabValue] = useState(0);
+  const [editMedicalDialog, setEditMedicalDialog] = useState(false);
+  const [editEmergencyDialog, setEditEmergencyDialog] = useState(false);
+  const [medicalForm, setMedicalForm] = useState({
+    conditions: '',
+    medications: '',
+    allergies: '',
+    instructions: '',
+  });
+  const [emergencyForm, setEmergencyForm] = useState({
+    name: '',
+    phone: '',
+    relationship: '',
+  });
 
   const { data: student, isLoading, error } = useQuery({
     queryKey: ['student', id],
@@ -78,20 +111,69 @@ export const StudentProfile: React.FC = () => {
     enabled: !!id,
   });
 
-  const { data: schoolAssociations } = useQuery({
-    queryKey: ['studentSchoolAssociations', student?.studentUniqueId],
-    queryFn: () => studentService.getStudentSchoolAssociations(student!.studentUniqueId),
-    enabled: !!student?.studentUniqueId,
+  const { data: enrollmentHistory } = useQuery({
+    queryKey: ['studentEnrollmentHistory', id],
+    queryFn: () => studentService.getStudentEnrollmentHistory(id!),
+    enabled: !!id,
   });
 
-  const { data: parentAssociations } = useQuery({
-    queryKey: ['studentParentAssociations', student?.studentUniqueId],
-    queryFn: () => studentService.getStudentParentAssociations(student!.studentUniqueId),
-    enabled: !!student?.studentUniqueId,
+  const { data: customFields } = useQuery({
+    queryKey: ['studentCustomFields', id],
+    queryFn: () => studentService.getStudentCustomFields(id!),
+    enabled: !!id,
+  });
+
+  const updateMedicalMutation = useMutation({
+    mutationFn: (data: typeof medicalForm) => 
+      studentService.updateStudentMedicalInfo(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student', id] });
+      toast.showToast('Medical information updated successfully', 'success');
+      setEditMedicalDialog(false);
+    },
+    onError: () => {
+      toast.showToast('Failed to update medical information', 'error');
+    },
+  });
+
+  const updateEmergencyMutation = useMutation({
+    mutationFn: (data: typeof emergencyForm) => 
+      studentService.updateStudentEmergencyContact(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student', id] });
+      toast.showToast('Emergency contact updated successfully', 'success');
+      setEditEmergencyDialog(false);
+    },
+    onError: () => {
+      toast.showToast('Failed to update emergency contact', 'error');
+    },
   });
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleEditMedical = () => {
+    if (student) {
+      setMedicalForm({
+        conditions: student.medical?.conditions || '',
+        medications: student.medical?.medications || '',
+        allergies: student.medical?.allergies || '',
+        instructions: student.medical?.instructions || '',
+      });
+      setEditMedicalDialog(true);
+    }
+  };
+
+  const handleEditEmergency = () => {
+    if (student) {
+      setEmergencyForm({
+        name: student.emergencyContact?.name || '',
+        phone: student.emergencyContact?.phone || '',
+        relationship: student.emergencyContact?.relationship || '',
+      });
+      setEditEmergencyDialog(true);
+    }
   };
 
   const canEditStudent = hasPermission(user?.role, 'students.edit');
@@ -186,7 +268,7 @@ export const StudentProfile: React.FC = () => {
                 </Grid>
                 <Grid item xs>
                   <Typography variant="h5" gutterBottom>
-                    {student.firstName} {student.middleName} {student.lastSurname}
+                    {student.firstName} {student.middleName || ''} {student.lastSurname}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <Badge fontSize="small" color="action" />
@@ -201,17 +283,25 @@ export const StudentProfile: React.FC = () => {
                       size="small"
                       variant="outlined"
                     />
-                    {student.birthSexDescriptor && (
+                    {student.birthSex && (
                       <Chip
-                        label={student.birthSexDescriptor.replace('http://ed-fi.org/BirthSexDescriptor#', '')}
+                        label={student.birthSex}
+                        size="small"
+                        variant="outlined"
+                      />
+                    )}
+                    {student.gradeLevel && (
+                      <Chip
+                        icon={<School sx={{ fontSize: '0.875rem' }} />}
+                        label={`Grade ${student.gradeLevel}`}
                         size="small"
                         variant="outlined"
                       />
                     )}
                     <Chip
-                      label="Active"
+                      label={student.enrollmentStatus || 'Active'}
                       size="small"
-                      color="success"
+                      color={student.enrollmentStatus === 'Active' ? 'success' : 'default'}
                     />
                   </Box>
                 </Grid>
@@ -249,7 +339,7 @@ export const StudentProfile: React.FC = () => {
                     Full Name
                   </Typography>
                   <Typography variant="body1" sx={{ mb: 2 }}>
-                    {student.firstName} {student.middleName} {student.lastSurname}
+                    {student.firstName} {student.middleName || ''} {student.lastSurname}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -270,22 +360,67 @@ export const StudentProfile: React.FC = () => {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Birth Sex
+                    Gender
                   </Typography>
                   <Typography variant="body1" sx={{ mb: 2 }}>
-                    {student.birthSexDescriptor?.replace('http://ed-fi.org/BirthSexDescriptor#', '') || 'Not specified'}
+                    {student.birthSex || 'Not specified'}
                   </Typography>
                 </Grid>
-                {student.studentIdentificationCodes?.length > 0 && (
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Grade Level
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {student.gradeLevel || 'Not specified'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Enrollment Status
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {student.enrollmentStatus || 'Active'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Email
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {student.email || 'Not provided'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Phone
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {student.phone || 'Not provided'}
+                  </Typography>
+                </Grid>
+                {student.address && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Other Identification
+                      Address
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {student.address}
+                      {student.city && `, ${student.city}`}
+                      {student.state && `, ${student.state}`}
+                      {student.zipCode && ` ${student.zipCode}`}
+                    </Typography>
+                  </Grid>
+                )}
+                {customFields && customFields.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Additional Information
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      {student.studentIdentificationCodes.map((code, index) => (
+                      {customFields.map((field: any) => (
                         <Chip
-                          key={index}
-                          label={`${code.studentIdentificationSystemDescriptor}: ${code.identificationCode}`}
+                          key={field.id}
+                          label={`${field.field.name}: ${field.value}`}
                           size="small"
                           variant="outlined"
                         />
@@ -298,69 +433,180 @@ export const StudentProfile: React.FC = () => {
 
             <TabPanel value={tabValue} index={1}>
               <Typography variant="h6" gutterBottom>
-                School Associations
+                Enrollment Information
               </Typography>
               <Divider sx={{ mb: 3 }} />
-              {schoolAssociations && schoolAssociations.length > 0 ? (
-                <Grid container spacing={2}>
-                  {schoolAssociations.map((association: any, index: number) => (
-                    <Grid item xs={12} key={index}>
-                      <Card variant="outlined">
-                        <CardContent>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                            <Box>
-                              <Typography variant="h6" gutterBottom>
-                                School ID: {association.schoolReference?.schoolId || 'Unknown'}
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <CalendarToday fontSize="small" color="action" />
+              
+              {/* Current Enrollment */}
+              {student.enrollments && student.enrollments.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>
+                    Current Courses
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {student.enrollments.map((enrollment: any) => (
+                      <Grid item xs={12} md={6} key={enrollment.id}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                              <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'medium' }}>
+                                  {enrollment.courseSection?.course?.courseName || 'Course'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {enrollment.courseSection?.sectionIdentifier || ''}
+                                </Typography>
+                                {enrollment.courseSection?.teacher && (
                                   <Typography variant="body2" color="text.secondary">
-                                    Entry Date: {new Date(association.entryDate).toLocaleDateString()}
+                                    Teacher: {enrollment.courseSection.teacher.firstName} {enrollment.courseSection.teacher.lastName}
                                   </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <School fontSize="small" color="action" />
-                                  <Typography variant="body2" color="text.secondary">
-                                    Grade Level: {association.entryGradeLevelDescriptor?.replace('http://ed-fi.org/GradeLevelDescriptor#', '') || 'N/A'}
-                                  </Typography>
-                                </Box>
+                                )}
                               </Box>
+                              <Chip
+                                label={enrollment.status}
+                                size="small"
+                                color={enrollment.status === 'Active' ? 'success' : 'default'}
+                              />
                             </Box>
-                            <Chip
-                              label="Current"
-                              size="small"
-                              color="primary"
-                            />
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Enrollment History */}
+              {enrollmentHistory && enrollmentHistory.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>
+                    Enrollment History
+                  </Typography>
+                  {enrollmentHistory.map((session: any, index: number) => (
+                    <Box key={index} sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="primary" gutterBottom>
+                        {session.sessionName}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {session.enrollments.map((enrollment: any) => (
+                          <Grid item xs={12} key={enrollment.id}>
+                            <Card variant="outlined">
+                              <CardContent>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                  <Box>
+                                    {enrollment.courseSection ? (
+                                      <>
+                                        <Typography variant="subtitle2">
+                                          {enrollment.courseSection.course.courseName}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Section: {enrollment.courseSection.sectionIdentifier}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Teacher: {enrollment.courseSection.teacher.firstName} {enrollment.courseSection.teacher.lastName}
+                                        </Typography>
+                                      </>
+                                    ) : enrollment.homeroom ? (
+                                      <>
+                                        <Typography variant="subtitle2">
+                                          Homeroom: {enrollment.homeroom.name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          School: {enrollment.homeroom.school?.name || 'Main School'}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Teacher: {enrollment.homeroom.teacher.firstName} {enrollment.homeroom.teacher.lastName}
+                                        </Typography>
+                                      </>
+                                    ) : null}
+                                    <Typography variant="body2" color="text.secondary">
+                                      Enrolled: {new Date(enrollment.enrollmentDate).toLocaleDateString()}
+                                    </Typography>
+                                  </Box>
+                                  <Chip
+                                    label={enrollment.status}
+                                    size="small"
+                                    color={enrollment.status === 'Active' ? 'success' : 'default'}
+                                  />
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
                   ))}
-                </Grid>
+                </Box>
               ) : (
                 <Alert severity="info">
-                  No enrollment information available
+                  No enrollment history available
                 </Alert>
               )}
             </TabPanel>
 
             <TabPanel value={tabValue} index={2}>
-              <Typography variant="h6" gutterBottom>
-                Parent/Guardian Contacts
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                  Contacts
+                </Typography>
+                {canEditStudent && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    icon={<Edit />}
+                    onClick={handleEditEmergency}
+                  >
+                    Edit Emergency Contact
+                  </Button>
+                )}
+              </Box>
               <Divider sx={{ mb: 3 }} />
-              {parentAssociations && parentAssociations.length > 0 ? (
+              
+              {/* Emergency Contact */}
+              {student.emergencyContact && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>
+                    Emergency Contact
+                  </Typography>
+                  <Card variant="outlined" sx={{ backgroundColor: 'error.50' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'start', gap: 2 }}>
+                        <Warning color="error" />
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 'medium' }}>
+                            {student.emergencyContact.name || 'Not specified'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Relationship: {student.emergencyContact.relationship || 'Not specified'}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                            <Phone fontSize="small" color="action" />
+                            <Typography variant="body2">
+                              {student.emergencyContact.phone || 'No phone number'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Box>
+              )}
+
+              {/* Parent/Guardian Contacts */}
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>
+                Parents/Guardians
+              </Typography>
+              {student.parents && student.parents.length > 0 ? (
                 <Grid container spacing={2}>
-                  {parentAssociations.map((association: any, index: number) => (
-                    <Grid item xs={12} md={6} key={index}>
+                  {student.parents.map((parent: any) => (
+                    <Grid item xs={12} md={6} key={parent.id}>
                       <Card variant="outlined">
                         <CardContent>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
-                            <Typography variant="h6">
-                              Parent ID: {association.parentReference?.parentUniqueId || 'Unknown'}
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'medium' }}>
+                              {parent.name}
                             </Typography>
-                            {association.primaryContactStatus && (
+                            {parent.isPrimary && (
                               <Chip
                                 label="Primary"
                                 size="small"
@@ -369,13 +615,24 @@ export const StudentProfile: React.FC = () => {
                             )}
                           </Box>
                           <Typography variant="body2" color="text.secondary">
-                            Relationship: {association.relationDescriptor?.replace('http://ed-fi.org/RelationDescriptor#', '') || 'N/A'}
+                            Relationship: {parent.relationship || 'Parent/Guardian'}
                           </Typography>
-                          <Box sx={{ mt: 2 }}>
-                            <Typography variant="caption" color="text.secondary">
-                              Note: Contact details not available in current API
-                            </Typography>
-                          </Box>
+                          {parent.email && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                              <Email fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {parent.email}
+                              </Typography>
+                            </Box>
+                          )}
+                          {parent.phone && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                              <Phone fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {parent.phone}
+                              </Typography>
+                            </Box>
+                          )}
                         </CardContent>
                       </Card>
                     </Grid>
@@ -389,25 +646,283 @@ export const StudentProfile: React.FC = () => {
             </TabPanel>
 
             <TabPanel value={tabValue} index={3}>
-              <Typography variant="h6" gutterBottom>
-                Medical Information
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                  Medical Information
+                </Typography>
+                {canEditStudent && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    icon={<Edit />}
+                    onClick={handleEditMedical}
+                  >
+                    Edit Medical Info
+                  </Button>
+                )}
+              </Box>
               <Divider sx={{ mb: 3 }} />
-              <Alert severity="info">
-                Medical information is not available through the current Ed-Fi API endpoints.
-              </Alert>
+              
+              {student.medical ? (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <LocalHospital color="error" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            Medical Conditions
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">
+                          {student.medical.conditions || 'None reported'}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <Medication color="primary" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            Medications
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">
+                          {student.medical.medications || 'None reported'}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <Warning color="warning" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            Allergies
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">
+                          {student.medical.allergies || 'None reported'}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <MedicalServices color="error" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            Emergency Instructions
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">
+                          {student.medical.instructions || 'No special instructions'}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Alert severity="info">
+                  No medical information has been recorded for this student.
+                </Alert>
+              )}
             </TabPanel>
 
             <TabPanel value={tabValue} index={4}>
               <Typography variant="h6" gutterBottom>
-                Enrollment History
+                Academic History
               </Typography>
               <Divider sx={{ mb: 3 }} />
-              <Alert severity="info">
-                Historical enrollment data is not available through the current Ed-Fi API endpoints.
-              </Alert>
+              
+              <Grid container spacing={3}>
+                {/* Recent Grades */}
+                {student.recentGrades && student.recentGrades.length > 0 && (
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <Assessment color="primary" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            Recent Grades
+                          </Typography>
+                        </Box>
+                        <List dense>
+                          {student.recentGrades.slice(0, 5).map((grade: any) => (
+                            <ListItem key={grade.id} sx={{ px: 0 }}>
+                              <ListItemText
+                                primary={grade.assignment?.title || 'Assignment'}
+                                secondary={`${grade.courseSection?.course?.courseName || 'Course'} - ${grade.letterGrade || grade.numericGrade || 'N/A'}`}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+                
+                {/* Recent Attendance */}
+                {student.recentAttendance && student.recentAttendance.length > 0 && (
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <EventAvailable color="primary" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            Recent Attendance
+                          </Typography>
+                        </Box>
+                        <List dense>
+                          {student.recentAttendance.slice(0, 5).map((attendance: any) => (
+                            <ListItem key={attendance.id} sx={{ px: 0 }}>
+                              <ListItemText
+                                primary={new Date(attendance.date).toLocaleDateString()}
+                                secondary={
+                                  <Chip
+                                    label={attendance.status}
+                                    size="small"
+                                    color={
+                                      attendance.status === 'Present' ? 'success' :
+                                      attendance.status === 'Absent' ? 'error' :
+                                      'warning'
+                                    }
+                                  />
+                                }
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+              </Grid>
             </TabPanel>
           </Paper>
+
+          {/* Medical Information Edit Dialog */}
+          <Dialog open={editMedicalDialog} onClose={() => setEditMedicalDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Edit Medical Information</DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Medical Conditions"
+                    multiline
+                    rows={2}
+                    value={medicalForm.conditions}
+                    onChange={(e) => setMedicalForm({ ...medicalForm, conditions: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Medications"
+                    multiline
+                    rows={2}
+                    value={medicalForm.medications}
+                    onChange={(e) => setMedicalForm({ ...medicalForm, medications: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Allergies"
+                    multiline
+                    rows={2}
+                    value={medicalForm.allergies}
+                    onChange={(e) => setMedicalForm({ ...medicalForm, allergies: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Emergency Medical Instructions"
+                    multiline
+                    rows={3}
+                    value={medicalForm.instructions}
+                    onChange={(e) => setMedicalForm({ ...medicalForm, instructions: e.target.value })}
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                variant="text"
+                onClick={() => setEditMedicalDialog(false)}
+                icon={<Cancel />}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => updateMedicalMutation.mutate(medicalForm)}
+                icon={<Save />}
+                disabled={updateMedicalMutation.isPending}
+              >
+                Save
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Emergency Contact Edit Dialog */}
+          <Dialog open={editEmergencyDialog} onClose={() => setEditEmergencyDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Edit Emergency Contact</DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Contact Name"
+                    value={emergencyForm.name}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, name: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Phone Number"
+                    value={emergencyForm.phone}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, phone: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Relationship"
+                    value={emergencyForm.relationship}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, relationship: e.target.value })}
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                variant="text"
+                onClick={() => setEditEmergencyDialog(false)}
+                icon={<Cancel />}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => updateEmergencyMutation.mutate(emergencyForm)}
+                icon={<Save />}
+                disabled={updateEmergencyMutation.isPending}
+              >
+                Save
+              </Button>
+            </DialogActions>
+          </Dialog>
         </>
       ) : null}
     </Box>

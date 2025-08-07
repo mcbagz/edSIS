@@ -487,7 +487,7 @@
           5,
           7
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -495,7 +495,7 @@
             "description": "Design and migrate database tables needed for attendance tracking, ensuring data integrity and performance.",
             "dependencies": [],
             "details": "• Use ORM migrations (e.g., TypeORM) to add AttendanceCode(id, code, description, isExcused boolean, sortOrder) and AttendanceRecord(id, studentId FK, sectionId FK NULL, date DATE, period INT NULL, codeId FK, recordedBy FK, createdAt, updatedAt).\n• Add composite unique index on (studentId, date, period) to enforce idempotent recording.\n• Create foreign-key constraints to Student, Section, User tables.\n• Seed common codes (P=Present, A=Absent, U=Unexcused, T=Tardy) in initial migration.\n• Include up/down scripts and generate SQL for review.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run migration in test DB, verify tables & indexes exist. Insert duplicate student/date/period rows to ensure constraint blocks duplicates."
           },
           {
@@ -506,7 +506,7 @@
               1
             ],
             "details": "Backend:\n• REST endpoints: GET /attendance/codes, POST, PATCH/:id, DELETE/:id guarded by ADMIN role.\n• Validate uniqueness of code string.\nFrontend:\n• Add \"Attendance Codes\" page under Admin settings.\n• Table view with inline edit, drag-drop sort (sortOrder field), delete with confirmation.\n• Use optimistic UI updates via SWR.\n• RBAC guard to restrict to admins.\n\nBusiness Rules:\n• Prevent deletion of codes referenced by AttendanceRecord; instead offer ‘disable’ toggle.\n• Mark one code as default ‘Present’.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Jest service tests for validation rules; Supertest for endpoint auth. Cypress admin flow: create new code, edit description, disable, ensure reflected in teacher UI."
           },
           {
@@ -518,7 +518,7 @@
               2
             ],
             "details": "• Service layer method recordAttendance({studentId, sectionId, date, period?, codeId, recordedBy}) performs upsert using unique index.\n• Endpoints:\n  - POST /attendance/daily {sectionId, date, records:[{studentId, code}]}\n  - POST /attendance/period {sectionId, date, period, records:[...]}.\n• Bulk save in transaction for speed; return updated records.\n• Enforce teacher can only record for sections they teach (via RBAC guard).\n• Normalize keyboard codes mapping (1=P,2=A,3=U,4=T) in service for later UI use.\n• Emit domain event AttendanceRecorded for downstream consumers (notifications, analytics).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: upsert returns same id on duplicate call, validation rejects unknown codeId. Integration tests with Supertest for bulk insert, permission denial, and event emission spy."
           },
           {
@@ -529,7 +529,7 @@
               3
             ],
             "details": "• React component on dashboard card opens modal/page listing students of selected section.\n• Fetch codes from /attendance/codes and map keys (1-9) to buttons; display legend.\n• Implement roster table with arrow key navigation; pressing numeric key posts record via /attendance/daily or /period depending on period selector.\n• Optimistically update cell color/status; handle API error rollback.\n• Persist selected date/period in URL query for reload persistence.\n• Add ‘Submit’ action that batches unsent changes.\n• Use SWR mutate after successful post to keep cache fresh.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Cypress tests: mark present for first 3 students using keys 1, then reload page and verify state saved. Accessibility test for keyboard-only navigation."
           },
           {
@@ -540,7 +540,7 @@
               3
             ],
             "details": "Notification Service:\n• CRON job (node-cron or Bull repeatable job) at 15:00 server time.\n• Query AttendanceRecord for current date where code.isExcused = false.\n• Join Student -> Guardian contacts; push message onto NotificationQueue (email + push).\n• Mark AttendanceRecord.notifiedAt to prevent duplicates.\n\nReports Enhancement:\n• Extend GET /attendance/reports?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&codeIds=1,3 to filter records.\n• Aggregate counts by student, section, date; return CSV or JSON based on Accept header.\n• Secure with RBAC (TEACHER gets own sections, ADMIN all).\n• Optimize query with covering index on (date, codeId).\n• Documentation via OpenAPI annotations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test cron query selects only unnotified absences. Integration test mocks notification gateway and asserts messages queued. Supertest for /attendance/reports with date range returns correct totals. Verify notifiedAt set after job run."
           }
         ]
@@ -558,7 +558,7 @@
           5,
           7
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -566,7 +566,7 @@
             "description": "Design and implement the Prisma models, relationships, and migrations for Assignment and Grade tables supporting weighted grading and letter/points storage.",
             "dependencies": [],
             "details": "• Extend existing Prisma schema with models: Assignment(id UUID, courseId FK, type ENUM('HW','Quiz','Exam','Project'), maxPoints Int, dueDate DateTime, weight Decimal(5,2), createdAt, updatedAt)\n• Grade(id UUID, assignmentId FK, studentId FK, points Decimal(6,2), letter String? (A–F), createdAt, updatedAt)\n• Add composite unique index (assignmentId, studentId) to avoid duplicates.\n• Run `prisma migrate dev` to generate SQL for PostgreSQL.\n• Seed script: create sample assignments for each course and random grades for test students to aid later subtasks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Use an in-memory SQLite instance to run Prisma unit tests asserting schema, indexes, FK constraints, and seed data row counts."
           },
           {
@@ -577,7 +577,7 @@
               1
             ],
             "details": "• Endpoints: POST/GET/PATCH/DELETE /assignments, /grades; GET /gradebooks/:courseId returns grid of students × assignments with points & letter.\n• Use Express + zod for request validation; JWT middleware to permit TEACHER role mutating actions.\n• Service layer functions: createAssignment, listAssignments(filter), upsertGrade(batch), fetchCourseGradebook.\n• For autosave support accept grade PATCH with {points, letter} body and return updated GPA stub field for eventual UI optimisations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Jest supertest: create assignment, add grades, fetch gradebook; assert 200 and schema validity, unauthorized user receives 403."
           },
           {
@@ -588,7 +588,7 @@
               2
             ],
             "details": "• Use react-data-grid for table; columns = assignments, rows = enrolled students.\n• Cell renderer toggles between display/input; onBlur or 500 ms debounce triggers PATCH /grades.\n• Show toast on save success/failure; optimistic UI update with rollback on error.\n• Implement virtual scrolling for courses >100 students.\n• Reuse component library (Task 4) theme; add keyboard shortcuts (arrow move, Enter edit).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Cypress: type new grade, wait for autosave, reload page, confirm persisted. Storybook interaction test for cell editing state."
           },
           {
@@ -599,7 +599,7 @@
               2
             ],
             "details": "• Weighted grade: group grades by Assignment.type, compute (sum(points/maxPoints) * weight) per category, sum to finalCourseGrade.\n• GPA: fetch completed courses with creditHours + final letter grade; map letter→points via scale table; formula = Σ(gradePoints*creditHours)/Σ(creditHours).\n• Config: store scale in DB table or env JSON; allow ?scale=5 parameter.\n• Add caching layer (Redis) keyed by studentId+period for 15 min.\n• Validate edge cases: pass/fail, incompletes excluded.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: mock assignments/grades to verify weighted calculation accuracy to 0.01; GPA rounding to 2 decimals; integration test hitting /gpa with seeded data."
           },
           {
@@ -611,7 +611,7 @@
               4
             ],
             "details": "• Endpoint GET /report-cards?studentId&term=2024Q1 returns PDF buffer.\n• Server: use Puppeteer to render HTML template → PDF; template pulls finalCourseGrade (Service 4), term GPA, attendance summary placeholder.\n• Layout: school logo header, table of courses (grade, %), footer with signature lines.\n• Store generated files in S3, return presigned URL; background job queues heavy rendering via BullMQ.\n• Add i18n for locale-based date formats.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration test: seed student data, call endpoint, assert 200 with application/pdf; checksum vs fixture for template regressions; visual regression using pdf-diff on CI."
           }
         ]
@@ -629,7 +629,7 @@
           8,
           9
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -637,7 +637,7 @@
             "description": "Create a reusable backend service capable of executing parameterised SQL templates, returning strongly-typed result sets and metadata that downstream exporters (CSV, PDF, JSON) can consume.",
             "dependencies": [],
             "details": "• Stack: NestJS provider called ReportEngineService.\n• Accepts: {templateId, params, outputMode} where outputMode = \"raw\" | \"stream\".\n• Template storage: keep SQL files in /reports/sql or a DB table with columns (id, name, sql, allowedRoles).\n• Use pg-format or pg-promise named-parameters for safe binding; forbid string concatenation.\n• Stream results with node-pg cursor for large datasets.\n• Return {columns, rows, rowStream} so callers can choose buffered or stream mode.\n• Include defensive guards: validate params, check for missing/extra placeholders, enforce max date range.\n• Populate initial templates for Student Roster, Attendance Summary, Grade Distribution, Demographic Breakdown.\n• Provide unit helpers to register new templates, easing future custom report builder work.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Jest unit tests: (1) Execute each seed template with mock pg client ⇒ expect correct columns; (2) Parameter binding rejects invalid SQL injection attempts; (3) Cursor returns all rows when streamed."
           },
           {
@@ -648,7 +648,7 @@
               1
             ],
             "details": "• Controller: GET /reports.\n• Query params: type (templateId), format (json|csv|pdf), plus dynamic params (period, sectionId, etc.).\n• RBAC: Use existing AuthGuard + new ReportRoleGuard that pulls allowedRoles from template registry and matches req.user.role.\n• Inject ReportEngineService to fetch data.\n• Audit: create ReportExecution entity (id, userId, templateId, params, executedAt, durationMs, rowCount) and save via TypeORM.\n• Response modes: if format=json → return JSON payload (columns + rows) for visualisation; csv/pdf delegated to subsequent subtasks.\n• Validate and sanitise query params; return 400 for unknown templateId.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Supertest integration: (1) ADMIN can fetch attendance JSON; TEACHER denied if not authorised; (2) Execution logged; (3) Unknown template ⇒ 400."
           },
           {
@@ -659,7 +659,7 @@
               2
             ],
             "details": "• Use fast-csv or csv-stringify to transform ReportEngineService rowStream into CSV.\n• Set response headers: Content-Disposition: attachment; filename=<templateId>_<timestamp>.csv.\n• Pipe database cursor → transform → res to stream directly, minimising RAM.\n• Include column header row.\n• Handle back-pressure and connection aborts gracefully.\n• Update audit log with byteSize.\n• Document in API spec.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration test: request CSV for Student Roster (10k rows) ⇒ stream finishes, row count matches query. Use `wget` or Supertest with `end` handler to assert header presence."
           },
           {
@@ -670,7 +670,7 @@
               2
             ],
             "details": "• Build handlebars/ejs HTML templates per report, embedding data table and optional chart placeholders.\n• Use Chart.js + chartjs-node-canvas to generate static images for charts in server context.\n• Launch headless Chromium via Puppeteer; load HTML string via `about:blank`; set page media to print; call `page.pdf()` with A4 landscape.\n• Stream resulting PDF as response with proper headers.\n• Cache compiled templates to improve performance.\n• Implement retry/back-off in case Chromium crashes.\n• Record pageCount and fileSize in audit log.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Automated: jest-puppeteer to generate Grade Distribution PDF and verify file opens and contains expected text using pdf-parse. Manual: open PDF to ensure charts render."
           },
           {
@@ -681,7 +681,7 @@
               2
             ],
             "details": "• Route: /reports/:type.\n• SWR fetcher calls /reports?type=<>&format=json with auth token.\n• Build ReportViewer component: table (MUI DataGrid) + ChartPanel.\n• Use Chart.js 4 via react-chartjs-2; map Attendance Summary to bar chart, Grade Distribution to pie, etc.\n• Provide export buttons: `Download CSV` (link to /reports?format=csv) and `Download PDF` (same for pdf).\n• Handle loading/error states, param filters (period selector, section dropdown).\n• Add a11y: ARIA labels, colour-blind palette.\n• Lazy-load charts to reduce bundle size.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Cypress e2e: login as teacher, open Attendance Summary page, assert chart canvas exists, export CSV and compare row count. Axe accessibility scan passes."
           }
         ]
@@ -689,7 +689,7 @@
     ],
     "metadata": {
       "created": "2025-08-05T07:27:53.608Z",
-      "updated": "2025-08-05T18:59:40.424Z",
+      "updated": "2025-08-07T05:13:50.891Z",
       "description": "Tasks for master context"
     }
   }

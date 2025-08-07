@@ -1,5 +1,33 @@
 import api from './api';
 
+export interface Section {
+  id: string;
+  sectionName: string;
+  sectionIdentifier: string;
+  courseCode: string;
+  courseName: string;
+  courseId: string;
+  teacherId?: string;
+  teacherName?: string;
+  roomNumber?: string;
+  sessionId: string;
+  sessionName?: string;
+  days: string[];
+  period?: string;
+  startTime?: string;
+  endTime?: string;
+  maxStudents: number;
+  enrolledCount?: number;
+  credits?: number;
+}
+
+export interface SectionEnrollment {
+  studentId: string;
+  studentName: string;
+  gradeLevel?: string;
+  enrollmentDate?: string;
+}
+
 export interface ScheduleConflict {
   sectionA: {
     id: string;
@@ -130,3 +158,50 @@ export const checkRoomAvailability = async (data: {
   const response = await api.post('/scheduling/check-room-availability', data);
   return response.data;
 };
+
+// Get all sections
+export const getSections = async (params?: {
+  sessionId?: string;
+  courseId?: string;
+  teacherId?: string;
+}): Promise<Section[]> => {
+  try {
+    const response = await api.get('/sections', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching sections:', error);
+    return [];
+  }
+};
+
+// Get section enrollment
+export const getSectionEnrollment = async (sectionId: string): Promise<SectionEnrollment[]> => {
+  try {
+    const response = await api.get(`/studentSectionAssociations?sectionReference.sectionIdentifier=${sectionId}`);
+    // Transform the Ed-Fi response to our format
+    const enrollments = response.data.map((assoc: any) => ({
+      studentId: assoc.studentReference?.studentUniqueId || '',
+      studentName: `${assoc.studentReference?.firstName || ''} ${assoc.studentReference?.lastName || ''}`.trim(),
+      gradeLevel: assoc.studentReference?.gradeLevel || '',
+      enrollmentDate: assoc.beginDate
+    }));
+    return enrollments;
+  } catch (error) {
+    console.error('Error fetching section enrollment:', error);
+    return [];
+  }
+};
+
+// Export as an object for consistency with other services
+const schedulingService = {
+  checkConflicts,
+  getTeacherSchedule,
+  getStudentSchedule,  
+  generateSchedule,
+  checkTeacherAvailability,
+  checkRoomAvailability,
+  getSections,
+  getSectionEnrollment
+};
+
+export default schedulingService;

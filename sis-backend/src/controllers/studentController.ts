@@ -72,7 +72,8 @@ export const studentController = {
         id: student.id,
         studentUniqueId: student.studentUniqueId,
         firstName: student.firstName,
-        lastSurname: student.lastName,
+        lastName: student.lastName,
+        lastSurname: student.lastName, // Include both for compatibility
         middleName: student.middleName,
         birthDate: student.birthDate,
         birthSex: student.gender,
@@ -183,7 +184,8 @@ export const studentController = {
         id: student.id,
         studentUniqueId: student.studentUniqueId,
         firstName: student.firstName,
-        lastSurname: student.lastName,
+        lastName: student.lastName,
+        lastSurname: student.lastName, // Include both for compatibility
         middleName: student.middleName,
         birthDate: student.birthDate,
         birthSex: student.gender,
@@ -358,6 +360,266 @@ export const studentController = {
     } catch (error) {
       console.error('Error fetching student attendance:', error);
       res.status(500).json({ message: 'Failed to fetch attendance' });
+    }
+  },
+
+  // Get student enrollment history
+  async getStudentEnrollmentHistory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: id },
+        include: {
+          courseSection: {
+            include: {
+              course: true,
+              teacher: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              session: true,
+            },
+          },
+          homeroom: {
+            include: {
+              school: true,
+              teacher: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { enrollmentDate: 'desc' },
+      });
+
+      // Group enrollments by school year/session
+      const enrollmentHistory = enrollments.reduce((acc: any[], enrollment) => {
+        const sessionName = enrollment.courseSection?.session?.name || 'Homeroom Only';
+        const existingSession = acc.find(s => s.sessionName === sessionName);
+        
+        if (existingSession) {
+          existingSession.enrollments.push(enrollment);
+        } else {
+          acc.push({
+            sessionName,
+            enrollments: [enrollment],
+          });
+        }
+        
+        return acc;
+      }, []);
+
+      res.json(enrollmentHistory);
+    } catch (error) {
+      console.error('Error fetching enrollment history:', error);
+      res.status(500).json({ message: 'Failed to fetch enrollment history' });
+    }
+  },
+
+  // Update student medical information
+  async updateStudentMedicalInfo(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { conditions, medications, allergies, instructions } = req.body;
+
+      const student = await prisma.student.update({
+        where: { id },
+        data: {
+          medicalConditions: conditions,
+          medications,
+          allergies,
+          emergencyMedicalInstructions: instructions,
+        },
+      });
+
+      res.json({
+        id: student.id,
+        medical: {
+          conditions: student.medicalConditions,
+          medications: student.medications,
+          allergies: student.allergies,
+          instructions: student.emergencyMedicalInstructions,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating medical information:', error);
+      res.status(500).json({ message: 'Failed to update medical information' });
+    }
+  },
+
+  // Update student emergency contacts
+  async updateStudentEmergencyContact(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { name, phone, relationship } = req.body;
+
+      const student = await prisma.student.update({
+        where: { id },
+        data: {
+          emergencyContactName: name,
+          emergencyContactPhone: phone,
+          emergencyContactRelation: relationship,
+        },
+      });
+
+      res.json({
+        id: student.id,
+        emergencyContact: {
+          name: student.emergencyContactName,
+          phone: student.emergencyContactPhone,
+          relationship: student.emergencyContactRelation,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating emergency contact:', error);
+      res.status(500).json({ message: 'Failed to update emergency contact' });
+    }
+  },
+
+  // Manage student-parent associations
+  async addStudentParent(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { parentId, relationship, isPrimary, hasLegalCustody } = req.body;
+
+      const studentParent = await prisma.studentParent.create({
+        data: {
+          studentId: id,
+          parentId,
+          relationship,
+          isPrimary: isPrimary || false,
+          hasLegalCustody: hasLegalCustody !== false,
+        },
+        include: {
+          parent: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      res.status(201).json(studentParent);
+    } catch (error) {
+      console.error('Error adding parent association:', error);
+      res.status(500).json({ message: 'Failed to add parent association' });
+    }
+  },
+
+  async removeStudentParent(req: AuthRequest, res: Response) {
+    try {
+      const { id, parentId } = req.params;
+
+      await prisma.studentParent.delete({
+        where: {
+          studentId_parentId: {
+            studentId: id,
+            parentId,
+          },
+        },
+      });
+
+      res.json({ message: 'Parent association removed successfully' });
+    } catch (error) {
+      console.error('Error removing parent association:', error);
+      res.status(500).json({ message: 'Failed to remove parent association' });
+    }
+  },
+
+  // Advanced search with multiple filters
+  async searchStudents(req: Request, res: Response) {
+    try {
+      const {
+        q,
+        gradeLevel,
+        enrollmentStatus,
+        homeroom,
+        hasIEP,
+        ethnicity,
+        gender,
+        limit = 50,
+        offset = 0,
+      } = req.query;
+
+      const where: any = {};
+
+      if (q) {
+        where.OR = [
+          { firstName: { contains: q as string, mode: 'insensitive' } },
+          { lastName: { contains: q as string, mode: 'insensitive' } },
+          { studentUniqueId: { contains: q as string, mode: 'insensitive' } },
+          { email: { contains: q as string, mode: 'insensitive' } },
+        ];
+      }
+
+      if (gradeLevel) where.gradeLevel = gradeLevel;
+      if (enrollmentStatus) where.enrollmentStatus = enrollmentStatus;
+      if (ethnicity) where.ethnicity = ethnicity;
+      if (gender) where.gender = gender;
+
+      if (homeroom) {
+        where.enrollments = {
+          some: {
+            homeroomId: homeroom,
+            status: 'Active',
+          },
+        };
+      }
+
+      const [students, totalCount] = await Promise.all([
+        prisma.student.findMany({
+          where,
+          skip: Number(offset),
+          take: Number(limit),
+          include: {
+            customFields: {
+              include: {
+                field: true,
+              },
+            },
+            enrollments: {
+              where: { status: 'Active' },
+              include: {
+                homeroom: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [
+            { lastName: 'asc' },
+            { firstName: 'asc' },
+          ],
+        }),
+        prisma.student.count({ where }),
+      ]);
+
+      // Transform students to include both lastName and lastSurname
+      const transformedStudents = students.map(student => ({
+        ...student,
+        lastSurname: student.lastName, // Add lastSurname for frontend compatibility
+      }));
+
+      res.json({
+        students: transformedStudents,
+        totalCount,
+        hasMore: Number(offset) + students.length < totalCount,
+      });
+    } catch (error) {
+      console.error('Error searching students:', error);
+      res.status(500).json({ message: 'Failed to search students' });
     }
   },
 };

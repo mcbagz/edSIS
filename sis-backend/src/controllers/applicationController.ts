@@ -193,4 +193,190 @@ export const applicationController = {
       res.status(500).json({ message: 'Failed to update documents' });
     }
   },
+
+  // Convert accepted application to enrolled student
+  async enrollAcceptedApplication(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { courseSectionIds, homeroomId } = req.body;
+
+      // Get the application and verify it's accepted
+      const application = await prisma.application.findUnique({
+        where: { id },
+        include: {
+          prospectiveStudent: true,
+        },
+      });
+
+      if (!application) {
+        res.status(404).json({ message: 'Application not found' });
+        return;
+      }
+
+      if (application.status !== 'ACCEPTED') {
+        res.status(400).json({ message: 'Only accepted applications can be enrolled' });
+        return;
+      }
+
+      // Check if student already exists
+      const existingStudent = await prisma.student.findFirst({
+        where: {
+          firstName: application.prospectiveStudent.firstName,
+          lastName: application.prospectiveStudent.lastName,
+          birthDate: application.prospectiveStudent.dateOfBirth,
+        },
+      });
+
+      if (existingStudent) {
+        res.status(400).json({ message: 'Student already exists in the system' });
+        return;
+      }
+
+      // Create student and enrollments in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Generate unique student ID
+        const studentCount = await tx.student.count();
+        const studentUniqueId = `STU${String(studentCount + 1).padStart(6, '0')}`;
+
+        // Create the student from prospective student data
+        const student = await tx.student.create({
+          data: {
+            studentUniqueId,
+            firstName: application.prospectiveStudent.firstName,
+            lastName: application.prospectiveStudent.lastName,
+            middleName: '',
+            birthDate: application.prospectiveStudent.dateOfBirth,
+            gender: application.prospectiveStudent.gender,
+            ethnicity: application.prospectiveStudent.ethnicity,
+            gradeLevel: '9', // Default - should be passed from frontend
+            email: application.prospectiveStudent.email,
+            phone: application.prospectiveStudent.phone,
+            address: application.prospectiveStudent.address,
+            city: application.prospectiveStudent.city,
+            state: application.prospectiveStudent.state,
+            zipCode: application.prospectiveStudent.zipCode,
+            emergencyContactName: application.prospectiveStudent.guardianName,
+            emergencyContactPhone: application.prospectiveStudent.guardianPhone,
+            emergencyContactRelation: application.prospectiveStudent.guardianRelation,
+          },
+        });
+
+        // Create homeroom enrollment
+        if (homeroomId) {
+          await tx.enrollment.create({
+            data: {
+              studentId: student.id,
+              homeroomId,
+            },
+          });
+        }
+
+        // Create course enrollments
+        if (courseSectionIds && courseSectionIds.length > 0) {
+          await Promise.all(
+            courseSectionIds.map((sectionId: string) =>
+              tx.enrollment.create({
+                data: {
+                  studentId: student.id,
+                  courseSectionId: sectionId,
+                },
+              })
+            )
+          );
+
+          // Update course section enrollment counts
+          await Promise.all(
+            courseSectionIds.map((sectionId: string) =>
+              tx.courseSection.update({
+                where: { id: sectionId },
+                data: {
+                  currentEnrollment: {
+                    increment: 1,
+                  },
+                },
+              })
+            )
+          );
+        }
+
+        return student;
+      });
+
+      res.status(201).json({
+        message: 'Student enrolled successfully',
+        student: result,
+      });
+    } catch (error) {
+      console.error('Error enrolling application:', error);
+      res.status(500).json({ message: 'Failed to enroll application' });
+    }
+  },
+
+  // Update application with additional details
+  async updateApplicationDetails(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      const application = await prisma.application.findUnique({
+        where: { id },
+      });
+
+      if (!application) {
+        res.status(404).json({ message: 'Application not found' });
+        return;
+      }
+
+      // Update prospective student details
+      if (updateData.prospectiveStudent) {
+        await prisma.prospectiveStudent.update({
+          where: { id: application.prospectiveStudentId },
+          data: updateData.prospectiveStudent,
+        });
+      }
+
+      // Update application notes
+      if (updateData.notes !== undefined) {
+        await prisma.application.update({
+          where: { id },
+          data: { notes: updateData.notes },
+        });
+      }
+
+      const updatedApplication = await prisma.application.findUnique({
+        where: { id },
+        include: {
+          prospectiveStudent: true,
+        },
+      });
+
+      res.json(updatedApplication);
+    } catch (error) {
+      console.error('Error updating application details:', error);
+      res.status(500).json({ message: 'Failed to update application details' });
+    }
+  },
+
+  // Get application statistics
+  async getApplicationStats(req: Request, res: Response) {
+    try {
+      const [total, applied, accepted, rejected] = await Promise.all([
+        prisma.application.count(),
+        prisma.application.count({ where: { status: 'APPLIED' } }),
+        prisma.application.count({ where: { status: 'ACCEPTED' } }),
+        prisma.application.count({ where: { status: 'REJECTED' } }),
+      ]);
+
+      res.json({
+        total,
+        applied,
+        accepted,
+        rejected,
+        acceptanceRate: total > 0 ? ((accepted / total) * 100).toFixed(1) : 0,
+      });
+    } catch (error) {
+      console.error('Error fetching application stats:', error);
+      res.status(500).json({ message: 'Failed to fetch application statistics' });
+    }
+  },
 };

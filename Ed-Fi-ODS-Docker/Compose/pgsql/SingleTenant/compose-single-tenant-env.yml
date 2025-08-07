@@ -16,6 +16,8 @@ services:
       - vol-db-ods:/var/lib/postgresql/data
     restart: always
     container_name: ed-fi-db-ods
+    networks:
+      - edfi-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready  -U ${POSTGRES_USER}"]
       start_period: "60s"
@@ -34,6 +36,8 @@ services:
       - ./bootstrap.sh:/docker-entrypoint-initdb.d/2-bootstrap.sh   # Mount the bootstrap.sh script
     restart: always
     container_name: ed-fi-db-admin
+    networks:
+      - edfi-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready  -U ${POSTGRES_USER}"]
       start_period: "60s"
@@ -47,13 +51,13 @@ services:
     ports:
       - "443:443"
     container_name: ed-fi-gateway
-    restart: always
-    hostname: nginx
-    volumes:
-      - ../../../ssl:/ssl/
+    networks:
+      - edfi-network
     depends_on:
-      - api
-      - adminapi
+      api:
+        condition: service_healthy
+      adminapi:
+        condition: service_healthy
 
   api:
     image: edfialliance/ods-api-web-api:${TAG}
@@ -74,14 +78,21 @@ services:
       ODS_CONNECTION_STRING_ENCRYPTION_KEY: "${ODS_CONNECTION_STRING_ENCRYPTION_KEY}"
     volumes:
       - ${LOGS_FOLDER}:/app/logs
+      - ./appsettings.dockertemplate.json:/app/appsettings.dockertemplate.json
+    entrypoint: ["/bin/sh"]
+    command: ["-c","envsubst < /app/appsettings.dockertemplate.json > /app/appsettings.docker.json && /app/run.sh"]
     depends_on:
-      - pb-ods
-      - pb-admin
+      pb-ods:
+        condition: service_healthy
+      pb-admin:
+        condition: service_healthy
     restart: always
     hostname: api
     container_name: ed-fi-ods-api
+    networks:
+      - edfi-network
     healthcheck:
-      test: $$API_HEALTHCHECK_TEST
+      test: $API_HEALTHCHECK_TEST
       start_period: "60s"
       retries: 3
 
@@ -102,11 +113,18 @@ services:
       AppSettings__DefaultPageSizeLimit: ${PAGING_LIMIT:-25}
       Authentication__AllowRegistration: "true"
       SwaggerSettings__EnableSwagger: "true"
+    volumes:
+      - ./appsettings.adminapi.dockertemplate.json:/app/appsettings.dockertemplate.json
+    entrypoint: ["/bin/sh"]
+    command: ["-c","envsubst < /app/appsettings.dockertemplate.json > /app/appsettings.docker.json && /app/run.sh"]
     depends_on:
-      - pb-admin
+      pb-admin:
+        condition: service_healthy
     restart: always
     hostname: ${ADMIN_API_VIRTUAL_NAME:-adminapi}
     container_name: ed-fi-adminapi
+    networks:
+      - edfi-network
     healthcheck:
       test: ${ADMIN_API_HEALTHCHECK_TEST}
       start_period: "60s"
@@ -125,8 +143,16 @@ services:
       PGBOUNCER_SET_DATABASE_PASSWORD: "yes"
     restart: always
     container_name: ed-fi-pb-admin
+    networks:
+      - edfi-network
     depends_on:
-      - db-admin
+      db-admin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x pgbouncer"]
+      start_period: "10s"
+      interval: "5s"
+      retries: 5
 
   pb-ods:
     image: bitnami/pgbouncer:1.23.1
@@ -141,8 +167,16 @@ services:
       PGBOUNCER_SET_DATABASE_PASSWORD: "yes"
     restart: always
     container_name: ed-fi-pb-ods
+    networks:
+      - edfi-network
     depends_on:
-      - db-ods
+      db-ods:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x pgbouncer"]
+      start_period: "10s"
+      interval: "5s"
+      retries: 5
 
 volumes:
   vol-db-admin:
@@ -152,3 +186,6 @@ volumes:
     driver: local
     name: vol-db-ods
 
+networks:
+  edfi-network:
+    driver: bridge

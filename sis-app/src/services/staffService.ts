@@ -46,3 +46,22 @@ export const createStaff = async (data: {
   const response = await api.post('/staff', data);
   return response.data;
 };
+
+export const updateStaff = async (id: string, data: Partial<Staff>): Promise<Staff> => {
+  const response = await api.put(`/staff/${id}`, data);
+  return response.data;
+};
+
+export const deleteStaff = async (id: string): Promise<void> => {
+  await api.delete(`/staff/${id}`);
+};
+
+export const getStaffSchedule = async (id: string): Promise<any> => {
+  const response = await api.get(`/staff/${id}/schedule`);
+  return response.data;
+};
+
+export const getStaffStats = async (): Promise<any> => {
+  const response = await api.get('/staff/stats');
+  return response.data;
+};

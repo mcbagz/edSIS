@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Grid,
@@ -8,6 +8,9 @@ import {
   CardContent,
   CardActions,
   Button,
+  CircularProgress,
+  Alert,
+  Skeleton,
 } from '@mui/material';
 import {
   People,
@@ -21,6 +24,9 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { dashboardService } from '../services/dashboardService';
+import type { DashboardStats, Announcement, Event } from '../services/dashboardService';
+import { format } from 'date-fns';
 
 interface StatCard {
   title: string;
@@ -33,35 +39,68 @@ interface StatCard {
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [statsData, announcementsData, eventsData] = await Promise.all([
+        dashboardService.getDashboardStats(),
+        dashboardService.getAnnouncements(),
+        dashboardService.getUpcomingEvents()
+      ]);
+
+      setStats(statsData);
+      setAnnouncements(announcementsData);
+      setEvents(eventsData);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatCards = (): StatCard[] => {
+    if (!stats) return [];
+
     switch (user?.role) {
       case 'ADMIN':
         return [
           {
             title: 'Total Students',
-            value: '1,234',
+            value: stats.totalStudents || 0,
             icon: <People />,
             color: '#1976d2',
             link: '/students',
           },
           {
             title: 'Total Staff',
-            value: '89',
+            value: stats.totalStaff || 0,
             icon: <School />,
             color: '#388e3c',
             link: '/staff',
           },
           {
             title: 'Attendance Today',
-            value: '94.5%',
+            value: stats.attendanceToday || '0%',
             icon: <EventNote />,
             color: '#f57c00',
             link: '/attendance',
           },
           {
             title: 'Active Courses',
-            value: '156',
+            value: stats.activeCourses || 0,
             icon: <Assignment />,
             color: '#7b1fa2',
             link: '/courses',
@@ -71,28 +110,28 @@ export const Dashboard: React.FC = () => {
         return [
           {
             title: 'My Students',
-            value: '125',
+            value: stats.myStudents || 0,
             icon: <People />,
             color: '#1976d2',
             link: '/students',
           },
           {
             title: 'Classes Today',
-            value: '6',
+            value: stats.classesToday || 0,
             icon: <Schedule />,
             color: '#388e3c',
             link: '/scheduling',
           },
           {
             title: 'Assignments Due',
-            value: '12',
+            value: stats.assignmentsDue || 0,
             icon: <Assignment />,
             color: '#f57c00',
             link: '/grades',
           },
           {
             title: 'Attendance Rate',
-            value: '96.2%',
+            value: stats.attendanceRate || '0%',
             icon: <EventNote />,
             color: '#7b1fa2',
             link: '/attendance',
@@ -102,25 +141,25 @@ export const Dashboard: React.FC = () => {
         return [
           {
             title: 'My Children',
-            value: '2',
+            value: stats.myChildren || 0,
             icon: <People />,
             color: '#1976d2',
           },
           {
             title: 'Attendance Rate',
-            value: '98%',
+            value: stats.attendanceRate || '0%',
             icon: <CheckCircle />,
             color: '#388e3c',
           },
           {
             title: 'Upcoming Events',
-            value: '3',
+            value: stats.upcomingEvents || 0,
             icon: <EventNote />,
             color: '#f57c00',
           },
           {
             title: 'Average Grade',
-            value: 'B+',
+            value: stats.averageGrade || 'N/A',
             icon: <TrendingUp />,
             color: '#7b1fa2',
             link: '/grades',
@@ -130,28 +169,28 @@ export const Dashboard: React.FC = () => {
         return [
           {
             title: 'My Courses',
-            value: '7',
+            value: stats.myCourses || 0,
             icon: <School />,
             color: '#1976d2',
             link: '/courses',
           },
           {
             title: 'Attendance',
-            value: '96%',
+            value: stats.attendance || '0%',
             icon: <EventNote />,
             color: '#388e3c',
             link: '/attendance',
           },
           {
             title: 'Current GPA',
-            value: '3.6',
+            value: stats.currentGPA || '0.0',
             icon: <TrendingUp />,
             color: '#f57c00',
             link: '/grades',
           },
           {
             title: 'Assignments Due',
-            value: '4',
+            value: stats.assignmentsDue || 0,
             icon: <Assignment />,
             color: '#7b1fa2',
           },
@@ -198,6 +237,49 @@ export const Dashboard: React.FC = () => {
 
   const statCards = getStatCards();
   const quickActions = getQuickActions();
+
+  const getAnnouncementPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'error.main';
+      case 'normal':
+        return 'text.primary';
+      case 'low':
+        return 'text.secondary';
+      default:
+        return 'text.primary';
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box>
+        <Skeleton variant="text" width={300} height={40} sx={{ mb: 2 }} />
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid item xs={12} sm={6} md={3} key={i}>
+              <Skeleton variant="rectangular" height={120} />
+            </Grid>
+          ))}
+        </Grid>
+        <Skeleton variant="rectangular" height={200} sx={{ mb: 4 }} />
+        <Skeleton variant="rectangular" height={300} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={fetchDashboardData}>
+          Retry
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -279,38 +361,82 @@ export const Dashboard: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* Announcements */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Recent Announcements
-        </Typography>
-        <Box sx={{ mt: 2 }}>
-          <Box sx={{ mb: 2, pb: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <Typography variant="subtitle1">
-              School Holiday - Presidents Day
+      {/* Two column layout for events and announcements */}
+      <Grid container spacing={3}>
+        {/* Upcoming Events */}
+        {events.length > 0 && (
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: '100%' }}>
+              <Typography variant="h6" gutterBottom>
+                Upcoming Events
+              </Typography>
+              <Box sx={{ mt: 2 }}>
+                {events.slice(0, 5).map((event, index) => (
+                  <Box
+                    key={event.id}
+                    sx={{
+                      mb: 2,
+                      pb: 2,
+                      borderBottom: index < events.length - 1 ? 1 : 0,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography variant="subtitle1">
+                      {event.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {format(new Date(event.date), 'MMMM d, yyyy')}
+                    </Typography>
+                    {event.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {event.description}
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          </Grid>
+        )}
+
+        {/* Announcements */}
+        <Grid item xs={12} md={events.length > 0 ? 6 : 12}>
+          <Paper sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom>
+              Recent Announcements
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              February 19, 2024 - School will be closed for Presidents Day
-            </Typography>
-          </Box>
-          <Box sx={{ mb: 2, pb: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <Typography variant="subtitle1">
-              Parent-Teacher Conferences
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              February 23-24, 2024 - Sign up for your conference slot
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle1">
-              Spring Break Reminder
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              March 11-15, 2024 - Have a safe and enjoyable break!
-            </Typography>
-          </Box>
-        </Box>
-      </Paper>
+            <Box sx={{ mt: 2 }}>
+              {announcements.length > 0 ? (
+                announcements.slice(0, 5).map((announcement, index) => (
+                  <Box
+                    key={announcement.id}
+                    sx={{
+                      mb: 2,
+                      pb: 2,
+                      borderBottom: index < announcements.length - 1 ? 1 : 0,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ color: getAnnouncementPriorityColor(announcement.priority) }}
+                    >
+                      {announcement.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {format(new Date(announcement.date), 'MMMM d, yyyy')} - {announcement.content}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No announcements at this time.
+                </Typography>
+              )}
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 };

@@ -10,7 +10,10 @@
       "Bash(curl:*)",
       "Bash(timeout:*)",
       "Bash(node:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(npx ts-node:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }

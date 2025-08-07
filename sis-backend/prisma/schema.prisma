@@ -122,6 +122,7 @@ model Student {
   attendances         Attendance[]
   grades              Grade[]
   disciplineIncidents StudentDisciplineIncident[]
+  customFields        StudentCustomField[]
 }
 
 model Parent {
@@ -412,4 +413,52 @@ model DisciplineAction {
   updatedAt           DateTime            @updatedAt
   
   incident            DisciplineIncident  @relation(fields: [incidentId], references: [id])
+}
+
+model CustomFieldDefinition {
+  id                  String              @id @default(uuid())
+  name                String              @unique
+  label               String
+  fieldType           String              // text, number, date, select, multiselect, boolean
+  entityType          String              // Student, Staff, Parent, Course, etc.
+  options             Json?               // For select/multiselect fields
+  required            Boolean             @default(false)
+  defaultValue        String?
+  displayOrder        Int                 @default(0)
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  studentCustomFields StudentCustomField[]
+}
+
+model StudentCustomField {
+  id                  String              @id @default(uuid())
+  studentId           String
+  fieldId             String
+  value               String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  field               CustomFieldDefinition @relation(fields: [fieldId], references: [id])
+  
+  @@unique([studentId, fieldId])
+  @@index([studentId])
+}
+
+model AttendanceCode {
+  id                  String              @id @default(uuid())
+  code                String              @unique
+  name                String
+  description         String?
+  type                String              // Present, Absent, Tardy, Excused
+  countsAsPresent     Boolean             @default(false)
+  countsAsAbsent      Boolean             @default(false)
+  countsAsTardy       Boolean             @default(false)
+  isExcused           Boolean             @default(false)
+  isActive            Boolean             @default(true)
+  displayOrder        Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 }

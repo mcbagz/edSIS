@@ -16,5 +16,8 @@ router.get('/applications/:id', authorize('ADMIN'), applicationController.getApp
 router.patch('/applications/:id/status', authorize('ADMIN'), applicationController.updateApplicationStatus);
 router.patch('/applications/:id/documents', applicationController.updateDocuments);
 router.get('/applications/download/:key', applicationController.getDownloadUrl);
+router.post('/applications/:id/enroll', authorize('ADMIN'), applicationController.enrollAcceptedApplication);
+router.put('/applications/:id/details', authorize('ADMIN'), applicationController.updateApplicationDetails);
+router.get('/applications/stats/summary', authorize('ADMIN'), applicationController.getApplicationStats);
 
 export default router;

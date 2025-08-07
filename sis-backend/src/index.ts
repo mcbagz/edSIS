@@ -10,6 +10,15 @@ import courseRoutes from './routes/courseRoutes';
 import schedulingRoutes from './routes/schedulingRoutes';
 import staffRoutes from './routes/staffRoutes';
 import schoolRoutes from './routes/schoolRoutes';
+import attendanceRoutes from './routes/attendanceRoutes';
+import attendanceRoutesV2 from './routes/attendanceRoutesV2';
+import gradebookRoutes from './routes/gradebookRoutes';
+import gradebookRoutesV2 from './routes/gradebookRoutesV2';
+import reportRoutes from './routes/reportRoutes';
+import disciplineRoutes from './routes/disciplineRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
+import customFieldRoutes from './routes/customFieldRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 
 dotenv.config();
 
@@ -41,6 +50,15 @@ app.use('/api', courseRoutes);
 app.use('/api', schedulingRoutes);
 app.use('/api', staffRoutes);
 app.use('/api', schoolRoutes);
+app.use('/api', attendanceRoutes);
+app.use('/api/v2/attendance', attendanceRoutesV2);
+app.use('/api', gradebookRoutes);
+app.use('/api/v2/gradebook', gradebookRoutesV2);
+app.use('/api', reportRoutes);
+app.use('/api/discipline', disciplineRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/custom-fields', customFieldRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

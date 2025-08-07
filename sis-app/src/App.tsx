@@ -14,6 +14,12 @@ import ApplicationsList from './pages/Admissions/ApplicationsList';
 import ApplicationForm from './pages/Admissions/ApplicationForm';
 import EnrollmentWizard from './pages/Enrollment/EnrollmentWizard';
 import { CourseCatalog, MasterSchedule, StudentSchedule, StudentScheduling } from './pages/Scheduling';
+import Attendance from './pages/Attendance';
+import Gradebook from './pages/Gradebook/Gradebook';
+import { Reports } from './pages/Reports';
+import { DisciplineManagement, IncidentForm } from './pages/Discipline';
+import StaffManagement from './pages/Staff/StaffManagement';
+import Settings from './pages/Settings/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,7 +52,8 @@ function App() {
                   <Route path="students/:id" element={<StudentProfile />} />
                   <Route path="students/:id/edit" element={<div>Edit Student - Coming Soon</div>} />
                   <Route path="students/new" element={<div>Add Student - Coming Soon</div>} />
-                  <Route path="staff" element={<div>Staff Management - Coming Soon</div>} />
+                  <Route path="staff" element={<StaffManagement />} />
+                  <Route path="staff/:id" element={<div>Staff Profile - Coming Soon</div>} />
                   <Route path="admissions">
                     <Route index element={<Navigate to="applications" replace />} />
                     <Route path="applications" element={<ApplicationsList />} />
@@ -61,10 +68,17 @@ function App() {
                     <Route path="student" element={<StudentSchedule />} />
                     <Route path="register" element={<StudentScheduling />} />
                   </Route>
-                  <Route path="attendance" element={<div>Attendance - Coming Soon</div>} />
-                  <Route path="grades" element={<div>Grades - Coming Soon</div>} />
-                  <Route path="reports" element={<div>Reports - Coming Soon</div>} />
-                  <Route path="settings" element={<div>Settings - Coming Soon</div>} />
+                  <Route path="attendance" element={<Attendance />} />
+                  <Route path="grades" element={<Gradebook />} />
+                  <Route path="discipline">
+                    <Route index element={<DisciplineManagement />} />
+                    <Route path="new" element={<IncidentForm />} />
+                    <Route path=":id" element={<IncidentForm />} />
+                    <Route path=":id/edit" element={<IncidentForm />} />
+                    <Route path="report" element={<div>Discipline Report - Coming Soon</div>} />
+                  </Route>
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="profile" element={<div>Profile - Coming Soon</div>} />
                 </Route>
                 <Route path="/unauthorized" element={<div>Unauthorized Access</div>} />

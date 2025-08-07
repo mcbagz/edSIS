@@ -10,6 +10,7 @@ import GradeIcon from '@mui/icons-material/Grade';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
+import GavelIcon from '@mui/icons-material/Gavel';
 
 export interface NavigationItem {
   label: string;
@@ -88,6 +89,12 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Attendance',
     path: '/attendance',
     icon: <CalendarTodayIcon />,
+    roles: ['admin', 'teacher'],
+  },
+  {
+    label: 'Discipline',
+    path: '/discipline',
+    icon: <GavelIcon />,
     roles: ['admin', 'teacher'],
   },
   {

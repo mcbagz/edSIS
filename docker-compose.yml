@@ -128,4 +128,4 @@ networks:
   # Assume Ed-Fi is running in its own docker network
   edfi-network:
     external: true
-    name: ed-fi-docker-compose_default
+    name: single-tenant-ods_edfi-network
