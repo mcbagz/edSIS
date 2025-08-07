@@ -13,7 +13,9 @@
       "Bash(npm start)",
       "Bash(npx ts-node:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": []
   }

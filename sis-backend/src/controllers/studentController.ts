@@ -189,6 +189,8 @@ export const studentController = {
         middleName: student.middleName,
         birthDate: student.birthDate,
         birthSex: student.gender,
+        gender: student.gender,
+        ethnicity: student.ethnicity,
         gradeLevel: student.gradeLevel,
         enrollmentDate: student.enrollmentDate,
         enrollmentStatus: student.enrollmentStatus,
@@ -238,12 +240,34 @@ export const studentController = {
       const studentCount = await prisma.student.count();
       const studentUniqueId = `STU${String(studentCount + 1).padStart(6, '0')}`;
 
+      // Map frontend field names to database field names
+      const mappedData: any = {
+        studentUniqueId,
+        firstName: studentData.firstName,
+        lastName: studentData.lastName || studentData.lastSurname,
+        middleName: studentData.middleName,
+        birthDate: new Date(studentData.birthDate),
+        gender: studentData.gender || studentData.birthSex,
+        ethnicity: studentData.ethnicity,
+        gradeLevel: studentData.gradeLevel,
+        enrollmentStatus: studentData.enrollmentStatus || 'Active',
+        email: studentData.email,
+        phone: studentData.phone,
+        address: studentData.address,
+        city: studentData.city,
+        state: studentData.state,
+        zipCode: studentData.zipCode,
+        emergencyContactName: studentData.emergencyContactName,
+        emergencyContactPhone: studentData.emergencyContactPhone,
+        emergencyContactRelation: studentData.emergencyContactRelation,
+        medicalConditions: studentData.medicalConditions,
+        medications: studentData.medications,
+        allergies: studentData.allergies,
+        emergencyMedicalInstructions: studentData.emergencyMedicalInstructions,
+      };
+
       const student = await prisma.student.create({
-        data: {
-          ...studentData,
-          studentUniqueId,
-          birthDate: new Date(studentData.birthDate),
-        },
+        data: mappedData,
       });
 
       res.status(201).json(student);
@@ -259,13 +283,36 @@ export const studentController = {
       const { id } = req.params;
       const updateData = req.body;
 
-      if (updateData.birthDate) {
-        updateData.birthDate = new Date(updateData.birthDate);
+      // Map frontend field names to database field names
+      const mappedData: any = {};
+      
+      if (updateData.firstName !== undefined) mappedData.firstName = updateData.firstName;
+      if (updateData.lastName !== undefined) mappedData.lastName = updateData.lastName || updateData.lastSurname;
+      if (updateData.middleName !== undefined) mappedData.middleName = updateData.middleName;
+      if (updateData.birthDate !== undefined) mappedData.birthDate = new Date(updateData.birthDate);
+      if (updateData.gender !== undefined || updateData.birthSex !== undefined) {
+        mappedData.gender = updateData.gender || updateData.birthSex;
       }
+      if (updateData.ethnicity !== undefined) mappedData.ethnicity = updateData.ethnicity;
+      if (updateData.gradeLevel !== undefined) mappedData.gradeLevel = updateData.gradeLevel;
+      if (updateData.enrollmentStatus !== undefined) mappedData.enrollmentStatus = updateData.enrollmentStatus;
+      if (updateData.email !== undefined) mappedData.email = updateData.email;
+      if (updateData.phone !== undefined) mappedData.phone = updateData.phone;
+      if (updateData.address !== undefined) mappedData.address = updateData.address;
+      if (updateData.city !== undefined) mappedData.city = updateData.city;
+      if (updateData.state !== undefined) mappedData.state = updateData.state;
+      if (updateData.zipCode !== undefined) mappedData.zipCode = updateData.zipCode;
+      if (updateData.emergencyContactName !== undefined) mappedData.emergencyContactName = updateData.emergencyContactName;
+      if (updateData.emergencyContactPhone !== undefined) mappedData.emergencyContactPhone = updateData.emergencyContactPhone;
+      if (updateData.emergencyContactRelation !== undefined) mappedData.emergencyContactRelation = updateData.emergencyContactRelation;
+      if (updateData.medicalConditions !== undefined) mappedData.medicalConditions = updateData.medicalConditions;
+      if (updateData.medications !== undefined) mappedData.medications = updateData.medications;
+      if (updateData.allergies !== undefined) mappedData.allergies = updateData.allergies;
+      if (updateData.emergencyMedicalInstructions !== undefined) mappedData.emergencyMedicalInstructions = updateData.emergencyMedicalInstructions;
 
       const student = await prisma.student.update({
         where: { id },
-        data: updateData,
+        data: mappedData,
       });
 
       res.json(student);

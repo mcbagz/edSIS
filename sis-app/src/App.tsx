@@ -10,8 +10,10 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { StudentsList } from './pages/Students/StudentsList';
 import { StudentProfile } from './pages/Students/StudentProfile';
+import { StudentEdit } from './pages/Students/StudentEdit';
 import ApplicationsList from './pages/Admissions/ApplicationsList';
 import ApplicationForm from './pages/Admissions/ApplicationForm';
+import ApplicationDetails from './pages/Admissions/ApplicationDetails';
 import EnrollmentWizard from './pages/Enrollment/EnrollmentWizard';
 import { CourseCatalog, MasterSchedule, StudentSchedule, StudentScheduling } from './pages/Scheduling';
 import Attendance from './pages/Attendance';
@@ -50,15 +52,15 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="students" element={<StudentsList />} />
                   <Route path="students/:id" element={<StudentProfile />} />
-                  <Route path="students/:id/edit" element={<div>Edit Student - Coming Soon</div>} />
-                  <Route path="students/new" element={<div>Add Student - Coming Soon</div>} />
+                  <Route path="students/:id/edit" element={<StudentEdit />} />
+                  <Route path="students/new" element={<StudentEdit />} />
                   <Route path="staff" element={<StaffManagement />} />
                   <Route path="staff/:id" element={<div>Staff Profile - Coming Soon</div>} />
                   <Route path="admissions">
                     <Route index element={<Navigate to="applications" replace />} />
                     <Route path="applications" element={<ApplicationsList />} />
                     <Route path="applications/new" element={<ApplicationForm />} />
-                    <Route path="applications/:id" element={<div>Application Details - Coming Soon</div>} />
+                    <Route path="applications/:id" element={<ApplicationDetails />} />
                   </Route>
                   <Route path="enrollment/:studentId" element={<EnrollmentWizard />} />
                   <Route path="courses" element={<CourseCatalog />} />

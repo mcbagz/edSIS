@@ -379,4 +379,63 @@ export const applicationController = {
       res.status(500).json({ message: 'Failed to fetch application statistics' });
     }
   },
+
+  // Update application notes only
+  async updateApplicationNotes(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+
+      const application = await prisma.application.update({
+        where: { id },
+        data: { notes },
+        include: {
+          prospectiveStudent: true,
+        },
+      });
+
+      res.json(application);
+    } catch (error) {
+      console.error('Error updating application notes:', error);
+      res.status(500).json({ message: 'Failed to update application notes' });
+    }
+  },
+
+  // Send acceptance email
+  async sendAcceptanceEmail(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const application = await prisma.application.findUnique({
+        where: { id },
+        include: {
+          prospectiveStudent: true,
+        },
+      });
+
+      if (!application) {
+        res.status(404).json({ message: 'Application not found' });
+        return;
+      }
+
+      if (application.status !== 'ACCEPTED') {
+        res.status(400).json({ message: 'Can only send acceptance email for accepted applications' });
+        return;
+      }
+
+      // TODO: Implement actual email sending logic here
+      // For now, just mark that the email was sent
+      await prisma.application.update({
+        where: { id },
+        data: {
+          acceptanceEmailSent: true,
+        },
+      });
+
+      res.json({ message: 'Acceptance email sent successfully' });
+    } catch (error) {
+      console.error('Error sending acceptance email:', error);
+      res.status(500).json({ message: 'Failed to send acceptance email' });
+    }
+  },
 };

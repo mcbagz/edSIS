@@ -128,11 +128,11 @@ export const StudentProfile: React.FC = () => {
       studentService.updateStudentMedicalInfo(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student', id] });
-      toast.showToast('Medical information updated successfully', 'success');
+      toast.success('Medical information updated successfully');
       setEditMedicalDialog(false);
     },
     onError: () => {
-      toast.showToast('Failed to update medical information', 'error');
+      toast.error('Failed to update medical information');
     },
   });
 
@@ -141,11 +141,11 @@ export const StudentProfile: React.FC = () => {
       studentService.updateStudentEmergencyContact(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student', id] });
-      toast.showToast('Emergency contact updated successfully', 'success');
+      toast.success('Emergency contact updated successfully');
       setEditEmergencyDialog(false);
     },
     onError: () => {
-      toast.showToast('Failed to update emergency contact', 'error');
+      toast.error('Failed to update emergency contact');
     },
   });
 
@@ -364,6 +364,14 @@ export const StudentProfile: React.FC = () => {
                   </Typography>
                   <Typography variant="body1" sx={{ mb: 2 }}>
                     {student.birthSex || 'Not specified'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Ethnicity
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {student.ethnicity || 'Not specified'}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>

@@ -43,4 +43,26 @@ export const enrollmentService = {
     const response = await api.delete(`/enrollment/${enrollmentId}`);
     return response.data;
   },
+
+  // Get enrollments for a specific section
+  async getSectionEnrollments(sectionId: string): Promise<any[]> {
+    const response = await api.get(`/enrollment/section/${sectionId}`);
+    return response.data;
+  },
+
+  // Enroll a student in a specific course section
+  async enrollStudentInSection(data: {
+    studentId: string;
+    courseSectionId: string;
+    status?: string;
+  }): Promise<any> {
+    const response = await api.post('/enrollment/section', data);
+    return response.data;
+  },
+
+  // Unenroll a student from a section
+  async unenrollStudent(enrollmentId: string): Promise<{ message: string }> {
+    const response = await api.delete(`/enrollment/${enrollmentId}`);
+    return response.data;
+  },
 };

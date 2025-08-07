@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
   Card,
   CardContent,
   Dialog,
@@ -35,14 +34,17 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Group as GroupIcon
 } from '@mui/icons-material';
+import { Button } from '../../components';
 import { useToast } from '../../components/molecules/Toast';
 import { getSections, createSection, updateSection, deleteSection } from '../../services/courseService';
 import { getCourses } from '../../services/courseService';
 import { checkTeacherAvailability, checkRoomAvailability } from '../../services/schedulingService';
 import { getStaff } from '../../services/staffService';
 import { getSchools, getCurrentSession } from '../../services/schoolService';
+import SectionEnrollmentModal from './SectionEnrollmentModal';
 
 const periods = ['1st Period', '2nd Period', '3rd Period', '4th Period', '5th Period', '6th Period', '7th Period', '8th Period'];
 const daysOfWeek = ['M', 'T', 'W', 'Th', 'F'];
@@ -70,6 +72,8 @@ export const MasterSchedule: React.FC = () => {
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('');
   const [availabilityWarning, setAvailabilityWarning] = useState('');
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+  const [selectedSectionForEnrollment, setSelectedSectionForEnrollment] = useState<any>(null);
   const { showToast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -272,6 +276,17 @@ export const MasterSchedule: React.FC = () => {
     }
   };
 
+  const handleOpenEnrollmentModal = (section: any) => {
+    setSelectedSectionForEnrollment(section);
+    setEnrollmentModalOpen(true);
+  };
+
+  const handleCloseEnrollmentModal = () => {
+    setEnrollmentModalOpen(false);
+    setSelectedSectionForEnrollment(null);
+    fetchData(); // Refresh data to update enrollment counts
+  };
+
   const filteredSections = sections.filter(section => {
     const matchesCourse = !selectedCourse || section.courseId === selectedCourse;
     const matchesTeacher = !selectedTeacher || section.teacherId === selectedTeacher;
@@ -395,13 +410,41 @@ export const MasterSchedule: React.FC = () => {
                   <TableCell>{section.time || '-'}</TableCell>
                   <TableCell>{getDayString(section.days)}</TableCell>
                   <TableCell>
-                    {section.currentEnrollment}/{section.maxStudents}
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => handleOpenEnrollmentModal(section)}
+                      startIcon={<GroupIcon />}
+                      sx={{ 
+                        minWidth: 'auto',
+                        color: section.currentEnrollment >= section.maxStudents ? 'error.main' : 'primary.main' 
+                      }}
+                    >
+                      {section.currentEnrollment}/{section.maxStudents}
+                    </Button>
                   </TableCell>
                   <TableCell>
-                    <IconButton onClick={() => handleOpenDialog(section)} size="small">
+                    <IconButton 
+                      onClick={() => handleOpenEnrollmentModal(section)} 
+                      size="small" 
+                      color="primary"
+                      title="Manage Enrollment"
+                    >
+                      <GroupIcon />
+                    </IconButton>
+                    <IconButton 
+                      onClick={() => handleOpenDialog(section)} 
+                      size="small"
+                      title="Edit Section"
+                    >
                       <EditIcon />
                     </IconButton>
-                    <IconButton onClick={() => handleDelete(section.id)} size="small" color="error">
+                    <IconButton 
+                      onClick={() => handleDelete(section.id)} 
+                      size="small" 
+                      color="error"
+                      title="Delete Section"
+                    >
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
@@ -548,6 +591,13 @@ export const MasterSchedule: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Section Enrollment Modal */}
+      <SectionEnrollmentModal
+        open={enrollmentModalOpen}
+        onClose={handleCloseEnrollmentModal}
+        section={selectedSectionForEnrollment}
+      />
     </Box>
   );
 };

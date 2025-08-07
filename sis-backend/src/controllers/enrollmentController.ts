@@ -285,6 +285,126 @@ export const enrollmentController = {
     }
   },
 
+  // Get enrollments for a specific section
+  async getSectionEnrollments(req: Request, res: Response) {
+    try {
+      const { sectionId } = req.params;
+
+      const enrollments = await prisma.enrollment.findMany({
+        where: {
+          courseSectionId: sectionId,
+          status: 'Active',
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              studentUniqueId: true,
+              firstName: true,
+              lastName: true,
+              gradeLevel: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: [
+          { student: { lastName: 'asc' } },
+          { student: { firstName: 'asc' } },
+        ],
+      });
+
+      res.json(enrollments);
+    } catch (error) {
+      console.error('Error fetching section enrollments:', error);
+      res.status(500).json({ message: 'Failed to fetch section enrollments' });
+    }
+  },
+
+  // Enroll a student in a specific course section
+  async enrollStudentInSection(req: AuthRequest, res: Response) {
+    try {
+      const { studentId, courseSectionId, status = 'Active' } = req.body;
+
+      // Check if student exists
+      const student = await prisma.student.findUnique({
+        where: { id: studentId },
+      });
+
+      if (!student) {
+        res.status(404).json({ message: 'Student not found' });
+        return;
+      }
+
+      // Check if section exists and has capacity
+      const section = await prisma.courseSection.findUnique({
+        where: { id: courseSectionId },
+        include: {
+          course: true,
+        },
+      });
+
+      if (!section) {
+        res.status(404).json({ message: 'Course section not found' });
+        return;
+      }
+
+      if (section.currentEnrollment >= section.maxStudents) {
+        res.status(400).json({ message: 'Section is at maximum capacity' });
+        return;
+      }
+
+      // Check if student is already enrolled in this section
+      const existingEnrollment = await prisma.enrollment.findFirst({
+        where: {
+          studentId,
+          courseSectionId,
+          status: 'Active',
+        },
+      });
+
+      if (existingEnrollment) {
+        res.status(400).json({ message: 'Student is already enrolled in this section' });
+        return;
+      }
+
+      // Create enrollment and update section count
+      const enrollment = await prisma.$transaction(async (tx) => {
+        const newEnrollment = await tx.enrollment.create({
+          data: {
+            studentId,
+            courseSectionId,
+            enrollmentDate: new Date(),
+            status,
+          },
+          include: {
+            student: true,
+            courseSection: {
+              include: {
+                course: true,
+              },
+            },
+          },
+        });
+
+        await tx.courseSection.update({
+          where: { id: courseSectionId },
+          data: {
+            currentEnrollment: {
+              increment: 1,
+            },
+          },
+        });
+
+        return newEnrollment;
+      });
+
+      res.status(201).json(enrollment);
+    } catch (error) {
+      console.error('Error enrolling student in section:', error);
+      res.status(500).json({ message: 'Failed to enroll student in section' });
+    }
+  },
+
   // Helper method to check time conflicts
   checkTimeConflicts(sections: any[]): any[] {
     const conflicts = [];

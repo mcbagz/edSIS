@@ -16,4 +16,8 @@ router.get('/enrollment/student/:studentId', enrollmentController.getStudentEnro
 router.post('/enrollment', authorize('ADMIN', 'STUDENT'), enrollmentController.enrollStudent);
 router.delete('/enrollment/:enrollmentId', authorize('ADMIN'), enrollmentController.dropCourse);
 
+// Section enrollments
+router.get('/enrollment/section/:sectionId', enrollmentController.getSectionEnrollments);
+router.post('/enrollment/section', authorize('ADMIN', 'TEACHER'), enrollmentController.enrollStudentInSection);
+
 export default router;

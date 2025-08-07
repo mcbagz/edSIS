@@ -77,6 +77,11 @@ const gradebookService = {
     return response.data;
   },
 
+  async getAssignmentsByCourseSection(courseSectionId: string): Promise<Assignment[]> {
+    // Alias for getAssignments for consistency
+    return this.getAssignments(courseSectionId);
+  },
+
   async getAssignment(id: string): Promise<Assignment & { grades: Grade[] }> {
     const response = await api.get(`/assignments/${id}`);
     return response.data;
@@ -170,4 +175,5 @@ const gradebookService = {
   }
 };
 
+export { gradebookService };
 export default gradebookService;

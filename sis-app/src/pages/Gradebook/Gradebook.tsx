@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import TeacherGradebook from './TeacherGradebook';
 import StudentGrades from './StudentGrades';
 import ReportCard from './ReportCard';
+import AssignmentManagement from './AssignmentManagement';
 import api from '../../services/api';
 
 interface TabPanelProps {
@@ -145,7 +146,7 @@ const Gradebook: React.FC = () => {
           {selectedSectionId && <TeacherGradebook courseSectionId={selectedSectionId} />}
         </TabPanel>
         <TabPanel value={tabValue} index={1}>
-          <Typography>Assignment management coming soon...</Typography>
+          {selectedSectionId && <AssignmentManagement courseSectionId={selectedSectionId} />}
         </TabPanel>
         <TabPanel value={tabValue} index={2}>
           <Typography>Class reports and analytics coming soon...</Typography>

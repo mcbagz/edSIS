@@ -32,15 +32,6 @@ export const applicationService = {
     return response.data;
   },
 
-  // Update application status
-  async updateApplicationStatus(
-    id: string,
-    status: 'APPLIED' | 'ACCEPTED' | 'REJECTED',
-    notes?: string
-  ): Promise<Application> {
-    const response = await api.patch(`/applications/${id}/status`, { status, notes });
-    return response.data;
-  },
 
   // Get presigned URL for document upload
   async getUploadUrl(applicationId: string, documentType: string): Promise<DocumentUploadResponse> {
@@ -71,5 +62,31 @@ export const applicationService = {
   // Process accepted application (trigger student creation)
   async processAcceptedApplication(applicationId: string): Promise<void> {
     await api.post('/webhooks/process-accepted-application', { applicationId });
+  },
+
+  // Get application by ID (alias for getApplication for consistency)
+  async getApplicationById(id: string): Promise<Application> {
+    return this.getApplication(id);
+  },
+
+  // Update application status with notes
+  async updateApplicationStatus(
+    id: string,
+    data: { status: string; notes?: string }
+  ): Promise<Application> {
+    const response = await api.patch(`/applications/${id}/status`, data);
+    return response.data;
+  },
+
+  // Update application notes
+  async updateApplicationNotes(id: string, notes: string): Promise<Application> {
+    const response = await api.patch(`/applications/${id}/notes`, { notes });
+    return response.data;
+  },
+
+  // Send acceptance email
+  async sendAcceptanceEmail(id: string): Promise<void> {
+    const response = await api.post(`/applications/${id}/send-acceptance-email`);
+    return response.data;
   },
 };

@@ -82,10 +82,10 @@ export const StudentsList: React.FC = () => {
     if (window.confirm('Are you sure you want to deactivate this student?')) {
       try {
         await studentService.deleteStudent(studentId);
-        toast.showToast('Student deactivated successfully', 'success');
+        toast.success('Student deactivated successfully');
         refetch();
       } catch (error) {
-        toast.showToast('Failed to deactivate student', 'error');
+        toast.error('Failed to deactivate student');
       }
     }
   }, [toast, refetch]);
