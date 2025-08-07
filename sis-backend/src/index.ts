@@ -19,6 +19,7 @@ import disciplineRoutes from './routes/disciplineRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import customFieldRoutes from './routes/customFieldRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import courseSectionRoutes from './routes/courseSectionRoutes';
 
 dotenv.config();
 
@@ -59,6 +60,7 @@ app.use('/api/discipline', disciplineRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/course-sections', courseSectionRoutes);
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

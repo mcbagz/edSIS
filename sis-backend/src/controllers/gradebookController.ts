@@ -4,6 +4,80 @@ import { PrismaClient } from '../generated/prisma';
 const prisma = new PrismaClient();
 
 export const gradebookController = {
+  // Grading Category endpoints
+  async getGradingCategories(req: Request, res: Response) {
+    try {
+      const { courseSectionId } = req.params;
+      const categories = await prisma.gradingCategory.findMany({
+        where: { courseSectionId },
+        orderBy: { displayOrder: 'asc' }
+      });
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching grading categories:', error);
+      res.status(500).json({ error: 'Failed to fetch grading categories' });
+    }
+  },
+
+  async createGradingCategory(req: Request, res: Response) {
+    try {
+      const { courseSectionId } = req.params;
+      const { name, weight, dropLowest, displayOrder } = req.body;
+      
+      const category = await prisma.gradingCategory.create({
+        data: {
+          courseSectionId,
+          name,
+          weight,
+          dropLowest: dropLowest || 0,
+          displayOrder: displayOrder || 0
+        }
+      });
+      
+      res.status(201).json(category);
+    } catch (error) {
+      console.error('Error creating grading category:', error);
+      res.status(500).json({ error: 'Failed to create grading category' });
+    }
+  },
+
+  async updateGradingCategory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { name, weight, dropLowest, displayOrder } = req.body;
+      
+      const category = await prisma.gradingCategory.update({
+        where: { id },
+        data: {
+          name,
+          weight,
+          dropLowest,
+          displayOrder
+        }
+      });
+      
+      res.json(category);
+    } catch (error) {
+      console.error('Error updating grading category:', error);
+      res.status(500).json({ error: 'Failed to update grading category' });
+    }
+  },
+
+  async deleteGradingCategory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      
+      await prisma.gradingCategory.delete({
+        where: { id }
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting grading category:', error);
+      res.status(500).json({ error: 'Failed to delete grading category' });
+    }
+  },
+
   // Assignment endpoints
   async getAssignments(req: Request, res: Response) {
     try {
@@ -368,6 +442,12 @@ export const gradebookController = {
       const { studentId, courseSectionId } = req.params;
       const { gradingPeriodId } = req.query;
 
+      // Get grading categories for this course section
+      const gradingCategories = await prisma.gradingCategory.findMany({
+        where: { courseSectionId },
+        orderBy: { displayOrder: 'asc' }
+      });
+
       const where: any = {
         studentId,
         courseSectionId,
@@ -386,22 +466,67 @@ export const gradebookController = {
       });
 
       // Group grades by category
-      const gradesByCategory: Record<string, { earned: number; possible: number; weight: number }> = {};
+      const gradesByCategory: Record<string, { 
+        earned: number; 
+        possible: number; 
+        weight: number;
+        grades: Array<{ points: number; maxPoints: number }>;
+        dropLowest: number;
+      }> = {};
       
+      // Initialize categories from settings
+      gradingCategories.forEach(cat => {
+        gradesByCategory[cat.name] = {
+          earned: 0,
+          possible: 0,
+          weight: cat.weight,
+          grades: [],
+          dropLowest: cat.dropLowest
+        };
+      });
+
+      // Populate grades
       grades.forEach(grade => {
-        if (!grade.assignment || !grade.points) return;
+        if (!grade.assignment || grade.points === null) return;
         
         const category = grade.assignment.category;
         if (!gradesByCategory[category]) {
+          // If category doesn't exist in settings, use default weight
           gradesByCategory[category] = {
             earned: 0,
             possible: 0,
-            weight: grade.assignment.weight
+            weight: 1,
+            grades: [],
+            dropLowest: 0
           };
         }
         
-        gradesByCategory[category].earned += grade.points;
-        gradesByCategory[category].possible += grade.assignment.maxPoints;
+        gradesByCategory[category].grades.push({
+          points: grade.points,
+          maxPoints: grade.assignment.maxPoints
+        });
+      });
+
+      // Calculate category scores with drop lowest
+      Object.values(gradesByCategory).forEach(category => {
+        if (category.grades.length > 0) {
+          // Sort grades by percentage (lowest first) if dropping lowest
+          if (category.dropLowest > 0 && category.grades.length > category.dropLowest) {
+            const sortedGrades = [...category.grades].sort((a, b) => {
+              const percentA = a.maxPoints > 0 ? (a.points / a.maxPoints) : 0;
+              const percentB = b.maxPoints > 0 ? (b.points / b.maxPoints) : 0;
+              return percentA - percentB;
+            });
+            
+            // Drop the lowest scores
+            const gradesToCount = sortedGrades.slice(category.dropLowest);
+            category.earned = gradesToCount.reduce((sum, g) => sum + g.points, 0);
+            category.possible = gradesToCount.reduce((sum, g) => sum + g.maxPoints, 0);
+          } else {
+            category.earned = category.grades.reduce((sum, g) => sum + g.points, 0);
+            category.possible = category.grades.reduce((sum, g) => sum + g.maxPoints, 0);
+          }
+        }
       });
 
       // Calculate weighted average
@@ -411,20 +536,28 @@ export const gradebookController = {
       Object.values(gradesByCategory).forEach(category => {
         if (category.possible > 0) {
           const categoryPercentage = (category.earned / category.possible) * 100;
-          totalWeightedScore += categoryPercentage * category.weight;
-          totalWeight += category.weight;
+          totalWeightedScore += categoryPercentage * (category.weight / 100); // Convert weight to decimal
+          totalWeight += category.weight / 100;
         }
       });
 
       const finalGrade = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
-      const letterGrade = getLetterGrade(finalGrade);
+      const letterGrade = await getLetterGrade(finalGrade, courseSectionId);
 
       res.json({
         studentId,
         courseSectionId,
         numericGrade: finalGrade,
         letterGrade,
-        gradesByCategory
+        gradesByCategory: Object.entries(gradesByCategory).map(([name, data]) => ({
+          name,
+          weight: data.weight,
+          earned: data.earned,
+          possible: data.possible,
+          percentage: data.possible > 0 ? (data.earned / data.possible) * 100 : 0,
+          assignmentCount: data.grades.length,
+          droppedCount: Math.min(data.dropLowest, data.grades.length)
+        }))
       });
     } catch (error) {
       console.error('Error calculating weighted grade:', error);
@@ -503,7 +636,7 @@ export const gradebookController = {
           });
 
           const percentage = totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
-          const letterGrade = getLetterGrade(percentage);
+          const letterGrade = await getLetterGrade(percentage, enrollment.courseSectionId || undefined);
 
           return {
             course: enrollment.courseSection?.course,
@@ -564,7 +697,8 @@ export const gradebookController = {
         const course = enrollment.courseSection?.course;
         if (!course) continue;
 
-        const gradePoints = getGradePoints(enrollment.grade, scale as string);
+        const schoolId = enrollment.courseSection?.schoolId;
+        const gradePoints = await getGradePoints(enrollment.grade, scale as string, schoolId);
         const credits = course.credits;
 
         totalQualityPoints += gradePoints * credits;
@@ -588,7 +722,38 @@ export const gradebookController = {
 };
 
 // Helper functions
-function getLetterGrade(percentage: number): string {
+async function getLetterGrade(percentage: number, courseSectionId?: string): Promise<string> {
+  // Try to get GPA scale from database
+  if (courseSectionId) {
+    try {
+      const courseSection = await prisma.courseSection.findUnique({
+        where: { id: courseSectionId },
+        include: { school: true }
+      });
+      
+      if (courseSection) {
+        const gpaScale = await prisma.gPAScale.findMany({
+          where: { 
+            schoolId: courseSection.schoolId,
+            name: 'Regular',
+            isActive: true
+          },
+          orderBy: { minPercentage: 'desc' }
+        });
+        
+        if (gpaScale.length > 0) {
+          const grade = gpaScale.find(scale => 
+            percentage >= scale.minPercentage && percentage <= scale.maxPercentage
+          );
+          return grade?.letterGrade || 'F';
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching GPA scale:', error);
+    }
+  }
+  
+  // Fallback to default scale
   if (percentage >= 93) return 'A';
   if (percentage >= 90) return 'A-';
   if (percentage >= 87) return 'B+';
@@ -603,7 +768,28 @@ function getLetterGrade(percentage: number): string {
   return 'F';
 }
 
-function getGradePoints(letterGrade: string, scale: string): number {
+async function getGradePoints(letterGrade: string, scale: string, schoolId?: string): Promise<number> {
+  // Try to get GPA scale from database
+  if (schoolId) {
+    try {
+      const gpaScaleEntry = await prisma.gPAScale.findFirst({
+        where: { 
+          schoolId,
+          letterGrade,
+          name: scale || 'Regular',
+          isActive: true
+        }
+      });
+      
+      if (gpaScaleEntry) {
+        return gpaScaleEntry.gradePoints;
+      }
+    } catch (error) {
+      console.error('Error fetching grade points:', error);
+    }
+  }
+  
+  // Fallback to default scale
   const gradePointMap: Record<string, number> = {
     'A': 4.0,
     'A-': 3.7,

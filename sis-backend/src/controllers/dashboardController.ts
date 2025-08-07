@@ -119,7 +119,7 @@ export const dashboardController = {
           const parent = await prisma.parent.findUnique({
             where: { userId: user.id },
             include: {
-              studentParents: {
+              parentStudents: {
                 include: {
                   student: {
                     include: {
@@ -142,7 +142,7 @@ export const dashboardController = {
             return res.status(404).json({ message: 'Parent profile not found' });
           }
 
-          const children = parent.studentParents.map((sp: any) => sp.student);
+          const children = parent.parentStudents.map((sp: any) => sp.student);
           
           // Calculate average attendance
           const totalAttendances = children.reduce((acc: number, child: any) => acc + child.attendances.length, 0);

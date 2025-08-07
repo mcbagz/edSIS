@@ -7,6 +7,12 @@ const router = Router();
 // All routes require authentication
 router.use(authMiddleware);
 
+// Grading Category routes
+router.get('/categories/:courseSectionId', gradebookController.getGradingCategories);
+router.post('/categories/:courseSectionId', gradebookController.createGradingCategory);
+router.put('/categories/:id', gradebookController.updateGradingCategory);
+router.delete('/categories/:id', gradebookController.deleteGradingCategory);
+
 // Assignment routes
 router.get('/assignments/section/:courseSectionId', gradebookController.getAssignments);
 router.get('/assignments/:id', gradebookController.getAssignment);

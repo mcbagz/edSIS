@@ -118,9 +118,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               }}
               aria-label="View notifications"
             >
-              <Badge badgeContent={4} color="error">
-                <Notifications />
-              </Badge>
+              <Notifications />
             </IconButton>
           </Tooltip>
 

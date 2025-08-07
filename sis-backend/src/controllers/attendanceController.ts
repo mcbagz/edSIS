@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import axios from 'axios';
 import https from 'https';
+import notificationService from '../utils/notificationService';
 
 // Configure axios to accept self-signed certificates for development
 const httpsAgent = new https.Agent({
@@ -216,6 +217,27 @@ export const recordDailyAttendance = async (req: Request, res: Response) => {
     });
 
     await Promise.all(promises);
+    
+    // Send notifications for absences and tardies
+    const notificationSettings = await notificationService.getNotificationSettings();
+    if (notificationSettings.attendanceAlertsEnabled) {
+      const notificationsToSend = attendanceRecords
+        .filter((record: any) => ['A', 'UA', 'T'].includes(record.attendanceCode))
+        .map((record: any) => ({
+          studentId: record.studentId,
+          studentName: record.studentName || 'Student',
+          attendanceCode: record.attendanceCode,
+          date: record.date,
+        }));
+      
+      if (notificationsToSend.length > 0) {
+        // Send notifications asynchronously without blocking the response
+        notificationService.sendBulkAttendanceAlerts(notificationsToSend).catch(err => {
+          console.error('Error sending attendance notifications:', err);
+        });
+      }
+    }
+    
     res.json({ success: true, message: 'Attendance recorded successfully' });
   } catch (error: any) {
     console.error('Error recording daily attendance:', error.response?.data || error.message);
@@ -296,6 +318,27 @@ export const recordPeriodAttendance = async (req: Request, res: Response) => {
     });
 
     await Promise.all(promises);
+    
+    // Send notifications for period absences and tardies
+    const notificationSettings = await notificationService.getNotificationSettings();
+    if (notificationSettings.attendanceAlertsEnabled) {
+      const notificationsToSend = attendanceRecords
+        .filter((record: any) => ['A', 'UA', 'T'].includes(record.attendanceCode))
+        .map((record: any) => ({
+          studentId: record.studentId,
+          studentName: record.studentName || 'Student',
+          attendanceCode: record.attendanceCode,
+          date: record.date,
+        }));
+      
+      if (notificationsToSend.length > 0) {
+        // Send notifications asynchronously without blocking the response
+        notificationService.sendBulkAttendanceAlerts(notificationsToSend).catch(err => {
+          console.error('Error sending period attendance notifications:', err);
+        });
+      }
+    }
+    
     res.json({ success: true, message: 'Period attendance recorded successfully' });
   } catch (error: any) {
     console.error('Error recording period attendance:', error.response?.data || error.message);

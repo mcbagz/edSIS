@@ -118,7 +118,7 @@ model Student {
   
   user                User?               @relation(fields: [userId], references: [id])
   enrollments         Enrollment[]
-  studentParents      StudentParent[]
+  parentStudents      StudentParent[]
   attendances         Attendance[]
   grades              Grade[]
   disciplineIncidents StudentDisciplineIncident[]
@@ -130,8 +130,8 @@ model Parent {
   userId          String          @unique
   firstName       String
   lastName        String
-  email           String
-  phone           String?
+  email           String?
+  phoneNumber     String?
   address         String?
   city            String?
   state           String?
@@ -140,7 +140,7 @@ model Parent {
   updatedAt       DateTime        @updatedAt
   
   user            User            @relation(fields: [userId], references: [id])
-  studentParents  StudentParent[]
+  parentStudents  StudentParent[]
 }
 
 model StudentParent {
@@ -198,6 +198,7 @@ model School {
   courseSections      CourseSection[]
   sessions            Session[]
   gradingPeriods      GradingPeriod[]
+  gpaScales           GPAScale[]
 }
 
 model Session {
@@ -288,6 +289,7 @@ model CourseSection {
   attendances         Attendance[]
   assignments         Assignment[]
   grades              Grade[]
+  gradingCategories   GradingCategory[]
   
   @@unique([courseId, sessionId, sectionIdentifier])
 }
@@ -461,4 +463,69 @@ model AttendanceCode {
   displayOrder        Int                 @default(0)
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
+}
+
+model NotificationLog {
+  id                  String              @id @default(uuid())
+  studentId           String
+  type                String              // ATTENDANCE, GRADE, DISCIPLINE
+  message             String
+  recipients          String              // Comma-separated list of recipients
+  sentAt              DateTime
+  status              String              @default("SENT") // SENT, FAILED, PENDING
+  errorMessage        String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  @@index([studentId])
+  @@index([type])
+  @@index([sentAt])
+}
+
+model NotificationSettings {
+  id                          String              @id @default(uuid())
+  attendanceAlertsEnabled     Boolean             @default(true)
+  gradeAlertsEnabled          Boolean             @default(true)
+  disciplineAlertsEnabled     Boolean             @default(true)
+  absenceThreshold            Int                 @default(1)     // Send alert after N absences
+  tardyThreshold              Int                 @default(3)     // Send alert after N tardies
+  gradeThreshold              Float               @default(70)    // Send alert for grades below N%
+  sendTime                    String              @default("08:00") // Time to send daily notifications
+  notifyOnWeekends            Boolean             @default(false)
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+}
+
+model GradingCategory {
+  id                  String              @id @default(uuid())
+  courseSectionId     String
+  name                String              // Homework, Quiz, Test, Project
+  weight              Float               // Percentage weight (e.g., 30 for 30%)
+  dropLowest          Int                 @default(0)     // Number of lowest scores to drop
+  displayOrder        Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  courseSection       CourseSection       @relation(fields: [courseSectionId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseSectionId, name])
+  @@index([courseSectionId])
+}
+
+model GPAScale {
+  id                  String              @id @default(uuid())
+  schoolId            String
+  name                String              // e.g., "Regular", "Honors", "AP"
+  letterGrade         String              // A+, A, A-, B+, B, B-, etc.
+  minPercentage       Float               // Minimum percentage for this grade
+  maxPercentage       Float               // Maximum percentage for this grade
+  gradePoints         Float               // 4.0, 3.7, 3.3, etc.
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  school              School              @relation(fields: [schoolId], references: [id])
+  
+  @@unique([schoolId, name, letterGrade])
+  @@index([schoolId])
 }

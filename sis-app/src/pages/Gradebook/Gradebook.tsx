@@ -65,7 +65,7 @@ const Gradebook: React.FC = () => {
       setLoading(true);
       
       // Load grading periods
-      const periodsResponse = await api.get('/grading-periods');
+      const periodsResponse = await api.get('/settings/grading-periods');
       setGradingPeriods(periodsResponse.data);
 
       if (user?.role === 'TEACHER') {

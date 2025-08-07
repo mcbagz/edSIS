@@ -80,7 +80,7 @@ export const studentController = {
         gradeLevel: student.gradeLevel,
         enrollmentDate: student.enrollmentDate,
         enrollmentStatus: student.enrollmentStatus,
-        email: student.email || student.user?.email,
+        email: student.email || (student as any).user?.email,
         phone: student.phone,
         address: student.address,
         city: student.city,
@@ -116,7 +116,7 @@ export const studentController = {
               isActive: true,
             },
           },
-          studentParents: {
+          parentStudents: {
             include: {
               parent: {
                 include: {
@@ -194,7 +194,7 @@ export const studentController = {
         gradeLevel: student.gradeLevel,
         enrollmentDate: student.enrollmentDate,
         enrollmentStatus: student.enrollmentStatus,
-        email: student.email || student.user?.email,
+        email: student.email || (student as any).user?.email,
         phone: student.phone,
         address: student.address,
         city: student.city,
@@ -211,17 +211,17 @@ export const studentController = {
           allergies: student.allergies,
           instructions: student.emergencyMedicalInstructions,
         },
-        parents: student.studentParents.map(sp => ({
+        parents: student.parentStudents.map((sp: any) => ({
           id: sp.parent.id,
           name: `${sp.parent.firstName} ${sp.parent.lastName}`,
           email: sp.parent.email || sp.parent.user?.email,
-          phone: sp.parent.phone,
+          phone: sp.parent.phoneNumber,
           relationship: sp.relationship,
           isPrimary: sp.isPrimary,
         })),
-        enrollments: student.enrollments,
-        recentAttendance: student.attendances,
-        recentGrades: student.grades,
+        enrollments: (student as any).enrollments,
+        recentAttendance: (student as any).attendances,
+        recentGrades: (student as any).grades,
       };
 
       res.json(transformed);

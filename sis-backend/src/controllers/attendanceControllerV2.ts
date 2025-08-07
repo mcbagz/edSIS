@@ -506,7 +506,7 @@ export const attendanceController = {
       const student = await prisma.student.findUnique({
         where: { id: studentId },
         include: {
-          studentParents: {
+          parentStudents: {
             include: {
               parent: true
             }
@@ -521,7 +521,7 @@ export const attendanceController = {
 
       // Here you would integrate with an email/SMS service
       // For now, we'll just log the notification
-      const notifications = student.studentParents.map(sp => ({
+      const notifications = student.parentStudents.map((sp: any) => ({
         parentName: `${sp.parent.firstName} ${sp.parent.lastName}`,
         parentEmail: sp.parent.email,
         studentName: `${student.firstName} ${student.lastName}`,

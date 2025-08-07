@@ -109,7 +109,7 @@ export class EnrollmentWorkflowService {
               firstName: parentUser.firstName,
               lastName: parentUser.lastName,
               email: application.prospectiveStudent.guardianEmail,
-              phone: application.prospectiveStudent.guardianPhone,
+              phoneNumber: application.prospectiveStudent.guardianPhone,
             },
           });
 
