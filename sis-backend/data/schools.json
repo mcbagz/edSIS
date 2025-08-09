@@ -1,0 +1,16 @@
+[
+    {
+        "id": "d234c0e4-26a3-40c4-9fd3-58ec43395dd3",
+        "schoolId": 1001,
+        "name": "Lincoln High School",
+        "type": "High",
+        "address": "123 Education Blvd",
+        "city": "Springfield",
+        "state": "IL",
+        "zipCode": "62701",
+        "phone": "(555) 123-4567",
+        "principal": "Dr. Jane Smith",
+        "createdAt": "2025-08-05T18:40:29.461Z",
+        "updatedAt": "2025-08-05T18:40:29.461Z"
+    }
+]

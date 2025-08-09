@@ -13,9 +13,13 @@ import {
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import TeacherGradebook from './TeacherGradebook';
+import SimpleGradebook from './SimpleGradebook';
 import StudentGrades from './StudentGrades';
 import ReportCard from './ReportCard';
 import AssignmentManagement from './AssignmentManagement';
+import GradingCategories from './GradingCategories';
+import Transcript from './Transcript';
+import AdminGradebook from './AdminGradebook';
 import api from '../../services/api';
 
 interface TabPanelProps {
@@ -123,6 +127,7 @@ const Gradebook: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="Gradebook" />
               <Tab label="Assignments" />
+              <Tab label="Categories" />
               <Tab label="Reports" />
             </Tabs>
             <FormControl sx={{ minWidth: 300 }}>
@@ -143,12 +148,15 @@ const Gradebook: React.FC = () => {
         </Box>
 
         <TabPanel value={tabValue} index={0}>
-          {selectedSectionId && <TeacherGradebook courseSectionId={selectedSectionId} />}
+          {selectedSectionId && <SimpleGradebook courseSectionId={selectedSectionId} />}
         </TabPanel>
         <TabPanel value={tabValue} index={1}>
           {selectedSectionId && <AssignmentManagement courseSectionId={selectedSectionId} />}
         </TabPanel>
         <TabPanel value={tabValue} index={2}>
+          {selectedSectionId && <GradingCategories courseSectionId={selectedSectionId} />}
+        </TabPanel>
+        <TabPanel value={tabValue} index={3}>
           <Typography>Class reports and analytics coming soon...</Typography>
         </TabPanel>
       </Box>
@@ -174,7 +182,7 @@ const Gradebook: React.FC = () => {
           <ReportCard studentId={studentData.id} gradingPeriods={gradingPeriods} />
         </TabPanel>
         <TabPanel value={tabValue} index={2}>
-          <Typography>Transcript coming soon...</Typography>
+          <Transcript studentId={studentData.id} />
         </TabPanel>
       </Box>
     );
@@ -194,29 +202,8 @@ const Gradebook: React.FC = () => {
 
   if (user?.role === 'ADMIN') {
     return (
-      <Box sx={{ width: '100%' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 3 }}>
-          <Typography variant="h4" sx={{ mb: 2 }}>Gradebook Administration</Typography>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label="Overview" />
-            <Tab label="Grade Reports" />
-            <Tab label="GPA Rankings" />
-            <Tab label="Settings" />
-          </Tabs>
-        </Box>
-
-        <TabPanel value={tabValue} index={0}>
-          <Typography>School-wide gradebook overview coming soon...</Typography>
-        </TabPanel>
-        <TabPanel value={tabValue} index={1}>
-          <Typography>Generate grade reports for all students...</Typography>
-        </TabPanel>
-        <TabPanel value={tabValue} index={2}>
-          <Typography>View GPA rankings and honor roll...</Typography>
-        </TabPanel>
-        <TabPanel value={tabValue} index={3}>
-          <Typography>Configure grading scales and policies...</Typography>
-        </TabPanel>
+      <Box sx={{ width: '100%', px: 3, pt: 3 }}>
+        <AdminGradebook />
       </Box>
     );
   }

@@ -34,6 +34,9 @@ router.get('/students/:id/attendance', studentController.getStudentAttendance);
 // Get student enrollment history
 router.get('/students/:id/enrollment-history', studentController.getStudentEnrollmentHistory);
 
+// Get student transcript
+router.get('/students/:id/transcript', studentController.getStudentTranscript);
+
 // Update student medical information
 router.put('/students/:id/medical', authorize('ADMIN'), studentController.updateStudentMedicalInfo);
 

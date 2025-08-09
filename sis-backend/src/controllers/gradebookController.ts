@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { PrismaClient } from '../generated/prisma';
+import edfiService from '../services/edfiService';
 
 const prisma = new PrismaClient();
 
@@ -289,6 +290,11 @@ export const gradebookController = {
         }
       });
 
+      // Sync to Ed-Fi in the background
+      edfiService.syncGrade(grade.id).catch((error) => {
+        console.error('Failed to sync grade to Ed-Fi:', error);
+      });
+
       res.status(201).json(grade);
     } catch (error) {
       console.error('Error creating grade:', error);
@@ -316,6 +322,11 @@ export const gradebookController = {
         }
       });
 
+      // Sync to Ed-Fi in the background
+      edfiService.syncGrade(grade.id).catch((error) => {
+        console.error('Failed to sync grade to Ed-Fi:', error);
+      });
+
       res.json(grade);
     } catch (error) {
       console.error('Error updating grade:', error);
@@ -335,6 +346,25 @@ export const gradebookController = {
         comment
       } = req.body;
 
+      console.log('Upsert grade request:', {
+        studentId,
+        courseSectionId,
+        assignmentId,
+        points,
+        numericGrade,
+        letterGrade
+      });
+
+      // Validate required fields
+      if (!studentId || !courseSectionId || !assignmentId) {
+        console.error('Missing required fields:', { studentId, courseSectionId, assignmentId });
+        res.status(400).json({ 
+          error: 'Missing required fields',
+          details: { studentId: !!studentId, courseSectionId: !!courseSectionId, assignmentId: !!assignmentId }
+        });
+        return;
+      }
+
       const grade = await prisma.grade.upsert({
         where: {
           studentId_courseSectionId_assignmentId: {
@@ -344,27 +374,43 @@ export const gradebookController = {
           }
         },
         update: {
-          numericGrade,
-          letterGrade,
-          points,
-          comment
+          numericGrade: numericGrade !== undefined ? numericGrade : undefined,
+          letterGrade: letterGrade !== undefined ? letterGrade : undefined,
+          points: points !== undefined ? points : undefined,
+          comment: comment !== undefined ? comment : undefined,
+          updatedAt: new Date()
         },
         create: {
           studentId,
           courseSectionId,
           assignmentId,
           gradeType: 'Assignment',
-          numericGrade,
-          letterGrade,
-          points,
-          comment
+          numericGrade: numericGrade || null,
+          letterGrade: letterGrade || null,
+          points: points || null,
+          comment: comment || null
         }
       });
 
+      console.log('Grade upserted successfully:', grade.id);
+      
+      // Sync to Ed-Fi in the background
+      edfiService.syncGrade(grade.id).catch((error) => {
+        console.error('Failed to sync grade to Ed-Fi:', error);
+      });
+      
       res.json(grade);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error upserting grade:', error);
-      res.status(500).json({ error: 'Failed to upsert grade' });
+      console.error('Error code:', error.code);
+      console.error('Error meta:', error.meta);
+      
+      // Send more detailed error information
+      res.status(500).json({ 
+        error: 'Failed to upsert grade',
+        message: error.message,
+        code: error.code
+      });
     }
   },
 

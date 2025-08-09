@@ -11,6 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "sync-edfi": "ts-node src/sync-to-edfi.ts",
+    "test-edfi": "ts-node src/test-edfi.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

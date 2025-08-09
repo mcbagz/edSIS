@@ -1,0 +1,114 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main, production ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_PREFIX: sis-edfi
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build and push SIS Backend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-backend:${{ github.sha }} ./sis-backend
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-backend:${{ github.sha }}
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-backend:${{ github.sha }} $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-backend:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-backend:latest
+
+    - name: Build and push SIS Frontend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-frontend:${{ github.sha }} \
+          --build-arg VITE_API_URL=${{ secrets.API_URL }} \
+          ./sis-app
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-frontend:${{ github.sha }}
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-frontend:${{ github.sha }} $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-frontend:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-frontend:latest
+
+    - name: Deploy to ECS
+      if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+      run: |
+        # Update ECS service with new image
+        aws ecs update-service \
+          --cluster sis-edfi-cluster \
+          --service sis-backend-service \
+          --force-new-deployment \
+          --region ${{ env.AWS_REGION }}
+        
+        aws ecs update-service \
+          --cluster sis-edfi-cluster \
+          --service sis-frontend-service \
+          --force-new-deployment \
+          --region ${{ env.AWS_REGION }}
+
+    - name: Deploy to EC2 (Alternative)
+      if: github.event.inputs.environment == 'staging'
+      run: |
+        # SSH to EC2 and update containers
+        echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
+        chmod 600 ec2-key.pem
+        
+        ssh -o StrictHostKeyChecking=no -i ec2-key.pem ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+          cd /opt/sis-edfi
+          git pull origin main
+          docker-compose -f docker-compose.all-in-one.yml pull
+          docker-compose -f docker-compose.all-in-one.yml build
+          docker-compose -f docker-compose.all-in-one.yml up -d
+        EOF
+
+    - name: Health Check
+      run: |
+        sleep 60
+        if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+          curl -f https://${{ secrets.PRODUCTION_URL }}/health || exit 1
+        else
+          curl -f http://${{ secrets.EC2_HOST }}/health || exit 1
+        fi
+
+    - name: Notify Deployment
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          Deployment to ${{ github.event.inputs.environment || 'staging' }} ${{ job.status }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

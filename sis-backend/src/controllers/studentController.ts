@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
 import { AuthRequest } from '../middleware/auth';
+import edfiService from '../services/edfiService';
 
 export const studentController = {
   // List all students with pagination and search
@@ -270,6 +271,11 @@ export const studentController = {
         data: mappedData,
       });
 
+      // Sync to Ed-Fi in the background
+      edfiService.syncStudent(student.id).catch((error) => {
+        console.error('Failed to sync student to Ed-Fi:', error);
+      });
+
       res.status(201).json(student);
     } catch (error) {
       console.error('Error creating student:', error);
@@ -313,6 +319,11 @@ export const studentController = {
       const student = await prisma.student.update({
         where: { id },
         data: mappedData,
+      });
+
+      // Sync to Ed-Fi in the background
+      edfiService.syncStudent(student.id).catch((error) => {
+        console.error('Failed to sync student to Ed-Fi:', error);
       });
 
       res.json(student);
@@ -669,4 +680,198 @@ export const studentController = {
       res.status(500).json({ message: 'Failed to search students' });
     }
   },
+
+  // Get student transcript
+  async getStudentTranscript(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      // Get student details
+      const student = await prisma.student.findUnique({
+        where: { id },
+      });
+
+      if (!student) {
+        res.status(404).json({ message: 'Student not found' });
+        return;
+      }
+
+      // Get school information
+      const school = await prisma.school.findFirst();
+
+      // Get all grades for the student with course information
+      const grades = await prisma.grade.findMany({
+        where: { studentId: id },
+        include: {
+          courseSection: {
+            include: {
+              course: true,
+              teacher: {
+                include: {
+                  user: true,
+                },
+              },
+              session: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      // Group grades by course section and calculate averages
+      const courseMap = new Map<string, any>();
+      
+      grades.forEach(grade => {
+        const section = grade.courseSection;
+        const courseKey = section.id;
+        
+        if (!courseMap.has(courseKey)) {
+          // Parse session name to get term and year (e.g., "Fall 2024")
+          const sessionName = section.session?.name || 'Fall 2024';
+          const [term, year] = sessionName.includes(' ') 
+            ? sessionName.split(' ') 
+            : ['Fall', '2024'];
+          
+          courseMap.set(courseKey, {
+            courseCode: section.course.courseCode,
+            courseName: section.course.name,
+            credits: section.course.credits || 1,
+            teacherName: section.teacher?.user ? 
+              `${section.teacher.user.firstName} ${section.teacher.user.lastName}` : 
+              'Staff',
+            term,
+            year,
+            gradeLevel: student.gradeLevel || 'N/A',
+            grades: [],
+          });
+        }
+
+        // Store numeric grades
+        if (grade.numericGrade !== null) {
+          courseMap.get(courseKey).grades.push(grade.numericGrade);
+        }
+      });
+
+      // Calculate final grades and GPAs
+      const academicHistory: any[] = [];
+      const termMap = new Map<string, any>();
+      let totalGradePoints = 0;
+      let totalCredits = 0;
+
+      courseMap.forEach((courseData) => {
+        // Calculate course average
+        const averageScore = courseData.grades.length > 0 
+          ? courseData.grades.reduce((sum: number, g: number) => sum + g, 0) / courseData.grades.length
+          : 0;
+        
+        // Convert to letter grade and grade points
+        const { letterGrade, gradePoints } = calculateLetterGrade(averageScore);
+        
+        const termKey = `${courseData.year}-${courseData.term}`;
+        
+        if (!termMap.has(termKey)) {
+          termMap.set(termKey, {
+            year: courseData.year,
+            term: courseData.term,
+            gradeLevel: courseData.gradeLevel,
+            courses: [],
+            termGradePoints: 0,
+            termCredits: 0,
+          });
+        }
+
+        const termData = termMap.get(termKey);
+        termData.courses.push({
+          courseCode: courseData.courseCode,
+          courseName: courseData.courseName,
+          credits: courseData.credits,
+          letterGrade,
+          gradePoints,
+          teacherName: courseData.teacherName,
+        });
+
+        termData.termGradePoints += gradePoints * courseData.credits;
+        termData.termCredits += courseData.credits;
+        
+        totalGradePoints += gradePoints * courseData.credits;
+        totalCredits += courseData.credits;
+      });
+
+      // Convert term map to academic history
+      termMap.forEach(termData => {
+        const termGPA = termData.termCredits > 0 
+          ? termData.termGradePoints / termData.termCredits 
+          : 0;
+        
+        academicHistory.push({
+          year: termData.year,
+          term: termData.term,
+          gradeLevel: termData.gradeLevel,
+          courses: termData.courses,
+          termGPA,
+          termCredits: termData.termCredits,
+        });
+      });
+
+      const cumulativeGPA = totalCredits > 0 ? totalGradePoints / totalCredits : 0;
+
+      // Get class rank (simplified)
+      const allStudents = await prisma.student.findMany({
+        where: { gradeLevel: student.gradeLevel },
+      });
+
+      // Format response
+      const transcript = {
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          studentId: student.studentUniqueId,
+          gradeLevel: student.gradeLevel || 'N/A',
+          dateOfBirth: student.birthDate,
+          enrollmentDate: student.enrollmentDate,
+        },
+        school: {
+          name: school?.name || 'School Name',
+          address: school?.address || '123 School St',
+          phone: school?.phone || '(555) 123-4567',
+          principal: school?.principal || 'Principal Name',
+        },
+        academicHistory: academicHistory.sort((a, b) => {
+          const yearDiff = parseInt(a.year) - parseInt(b.year);
+          if (yearDiff !== 0) return yearDiff;
+          const termOrder: Record<string, number> = { 'Fall': 0, 'Spring': 1, 'Summer': 2 };
+          return (termOrder[a.term] || 0) - (termOrder[b.term] || 0);
+        }),
+        cumulativeGPA,
+        totalCredits,
+        classRank: 1, // Simplified - would need actual calculation
+        classSize: allStudents.length,
+        graduationDate: null, // Would need to be calculated based on grade level
+      };
+
+      res.json(transcript);
+    } catch (error) {
+      console.error('Error generating transcript:', error);
+      res.status(500).json({ message: 'Failed to generate transcript' });
+    }
+  },
 };
+
+// Helper function to calculate letter grade and grade points
+function calculateLetterGrade(percentage: number): { letterGrade: string; gradePoints: number } {
+  if (percentage >= 97) return { letterGrade: 'A+', gradePoints: 4.0 };
+  if (percentage >= 93) return { letterGrade: 'A', gradePoints: 4.0 };
+  if (percentage >= 90) return { letterGrade: 'A-', gradePoints: 3.7 };
+  if (percentage >= 87) return { letterGrade: 'B+', gradePoints: 3.3 };
+  if (percentage >= 83) return { letterGrade: 'B', gradePoints: 3.0 };
+  if (percentage >= 80) return { letterGrade: 'B-', gradePoints: 2.7 };
+  if (percentage >= 77) return { letterGrade: 'C+', gradePoints: 2.3 };
+  if (percentage >= 73) return { letterGrade: 'C', gradePoints: 2.0 };
+  if (percentage >= 70) return { letterGrade: 'C-', gradePoints: 1.7 };
+  if (percentage >= 67) return { letterGrade: 'D+', gradePoints: 1.3 };
+  if (percentage >= 65) return { letterGrade: 'D', gradePoints: 1.0 };
+  return { letterGrade: 'F', gradePoints: 0.0 };
+}

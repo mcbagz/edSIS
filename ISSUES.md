@@ -8,10 +8,6 @@ This document outlines the discrepancies between the `SIS-Detailed-Specification
 
 The attendance module is present but lacks the reporting and notification features specified.
 
-### **Missing Backend Features & DB Changes:**
-
-- **Automated Notifications:** There is no mechanism to trigger alerts to parents for absences. This would require a notification system and integration with a communication service (e.g., email, SMS).
-
 ### **Missing Frontend Features:**
 
 - **Bulk Attendance Entry:** The UI for taking attendance is likely one student at a time. A more efficient interface for teachers to take attendance for an entire class period is needed.

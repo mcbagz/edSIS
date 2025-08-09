@@ -358,7 +358,7 @@ async function main() {
       firstName: 'Parent',
       lastName: 'User',
       email: 'parent@school.edu',
-      phone: '(555) 111-2222',
+      phoneNumber: '(555) 111-2222',
       address: '123 Parent Street',
       city: 'Springfield',
       state: 'IL',

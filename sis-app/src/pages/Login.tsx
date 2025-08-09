@@ -95,16 +95,13 @@ export const Login: React.FC = () => {
           </Typography>
           <Box sx={{ mt: 1 }}>
             <Typography variant="caption" color="text.secondary" component="div" align="center">
-              Admin: admin@school.edu / admin123
+              (admin) admin@school.edu / admin123
             </Typography>
             <Typography variant="caption" color="text.secondary" component="div" align="center">
-              Teacher: teacher@school.edu / teacher123
+              (teacher) r.anderson@school.edu / password123
             </Typography>
             <Typography variant="caption" color="text.secondary" component="div" align="center">
-              Parent: parent@school.edu / parent123
-            </Typography>
-            <Typography variant="caption" color="text.secondary" component="div" align="center">
-              Student: student@school.edu / student123
+              (student) liam.smith@student.edu / password123
             </Typography>
           </Box>
         </Paper>

@@ -20,6 +20,7 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import customFieldRoutes from './routes/customFieldRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import courseSectionRoutes from './routes/courseSectionRoutes';
+import edfiRoutes from './routes/edfiRoutes';
 
 dotenv.config();
 
@@ -61,6 +62,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/course-sections', courseSectionRoutes);
+app.use('/api/edfi', edfiRoutes);
 
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

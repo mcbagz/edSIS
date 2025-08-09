@@ -16,7 +16,9 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
       "Bash(npm ls:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(rm:*)",
+      "Bash(npm run sync-edfi:*)"
     ],
     "deny": []
   }

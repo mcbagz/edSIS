@@ -1,32 +1,39 @@
 import axios from 'axios';
-import https from 'https';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configure axios to accept self-signed certificates
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false
-});
-
 async function testEdFiConnection() {
   console.log('Testing Ed-Fi Connection...');
-  console.log('API Base URL:', process.env.EDFI_API_BASE_URL);
-  
+
+  const baseURL = process.env.EDFI_API_BASE_URL;
+  const clientId = process.env.EDFI_API_CLIENT_ID;
+  const clientSecret = process.env.EDFI_API_CLIENT_SECRET;
+
+  if (!baseURL || !clientId || !clientSecret) {
+    console.error('❌ Missing required Ed-Fi environment variables.');
+    console.error('Please ensure EDFI_API_BASE_URL, EDFI_API_CLIENT_ID, and EDFI_API_CLIENT_SECRET are set in your .env file.');
+    return;
+  }
+
+  console.log('API Base URL:', baseURL);
+  console.log('API Client ID:', clientId);
+
+  const isHttps = baseURL.startsWith('https');
+  const axiosConfig: any = isHttps ? { httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) } : {};
+
   try {
     // Test basic API endpoint
-    const apiResponse = await axios.get(
-      (process.env.EDFI_API_BASE_URL || 'https://localhost/api'),
-      { httpsAgent } as any
-    );
+    const apiResponse = await axios.get(baseURL, axiosConfig);
     console.log('✅ Ed-Fi API is reachable');
     console.log('Ed-Fi Version:', (apiResponse.data as any).version);
     console.log('Data Models:', (apiResponse.data as any).dataModels);
-    
-    // Test OAuth endpoint with minimal credentials
-    console.log('\nTesting OAuth with minimal credentials...');
-    const tokenUrl = (process.env.EDFI_API_BASE_URL || 'https://localhost/api') + '/oauth/token';
-    
+
+    // Test OAuth endpoint
+    console.log('\nTesting OAuth with provided credentials...');
+    const tokenUrl = `${baseURL}/oauth/token`;
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
     try {
       const tokenResponse = await axios.post(
         tokenUrl,
@@ -34,42 +41,46 @@ async function testEdFiConnection() {
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic ' + Buffer.from('minimal:minimalSecret').toString('base64')
+            'Authorization': `Basic ${credentials}`
           },
-          httpsAgent
-        } as any
+          ...axiosConfig
+        }
       );
       console.log('✅ OAuth token obtained successfully');
-      console.log('Token:', (tokenResponse.data as any).access_token?.substring(0, 20) + '...');
+      const accessToken = (tokenResponse.data as any).access_token;
+      console.log('Token:', accessToken.substring(0, 20) + '...');
+
+      // Test data endpoint with auth
+      console.log('\nTesting data endpoint with authentication...');
+      try {
+        const dataResponse = await axios.get(
+          `${baseURL}/data/v3/ed-fi/schools`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
+            },
+            ...axiosConfig
+          }
+        );
+        console.log('✅ Data endpoint accessible and returned data.');
+        console.log(`Found ${(dataResponse.data as any).length} schools.`);
+      } catch (dataError: any) {
+        console.log('❌ Data endpoint error:', dataError.response?.data || dataError.message);
+      }
+
     } catch (oauthError: any) {
       console.log('❌ OAuth failed:', oauthError.response?.data || oauthError.message);
-      console.log('\nThe "minimal" credentials may not be configured in Ed-Fi.');
-      console.log('You need to:');
-      console.log('1. Access Ed-Fi Admin App or Admin API');
-      console.log('2. Create an API client/application');
-      console.log('3. Update the .env file with the correct credentials');
+      console.log('\nPlease check your EDFI_API_CLIENT_ID and EDFI_API_CLIENT_SECRET values.');
     }
-    
-    // Test data endpoint (will fail without auth but shows connectivity)
-    console.log('\nTesting data endpoint...');
-    try {
-      const dataResponse = await axios.get(
-        (process.env.ED_FI_API_BASE || 'https://localhost/api/data/v3') + '/ed-fi/schools',
-        { httpsAgent } as any
-      );
-      console.log('✅ Data endpoint accessible');
-    } catch (dataError: any) {
-      if (dataError.response?.status === 401) {
-        console.log('✅ Data endpoint reachable (401 Unauthorized expected without token)');
-      } else {
-        console.log('❌ Data endpoint error:', dataError.message);
-      }
-    }
-    
+
   } catch (error: any) {
     console.error('❌ Failed to connect to Ed-Fi:', error.message);
     if (error.code === 'ECONNREFUSED') {
       console.log('\nMake sure Ed-Fi ODS is running and accessible at the configured URL');
+    }
+    if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
     }
   }
 }

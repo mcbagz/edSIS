@@ -1,0 +1,216 @@
+version: '3.8'
+
+services:
+  # SIS PostgreSQL Database
+  sis-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${SIS_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${SIS_POSTGRES_PASSWORD:-980jlej.23kd}
+      POSTGRES_DB: ${SIS_POSTGRES_DB:-sis_db}
+    volumes:
+      - sis-postgres-data:/var/lib/postgresql/data
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d sis_db -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ed-Fi ODS Database
+  edfi-db-ods:
+    image: edfialliance/ods-api-db-ods:v7.1-postgresql
+    environment:
+      POSTGRES_USER: ${EDFI_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${EDFI_POSTGRES_PASSWORD:-980jlej.23kd}
+      POSTGRES_DB: postgres
+      TPDM_ENABLED: ${TPDM_ENABLED:-true}
+    volumes:
+      - edfi-db-ods-data:/var/lib/postgresql/data
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ed-Fi Admin Database
+  edfi-db-admin:
+    image: edfialliance/ods-api-db-admin:v7.1-postgresql
+    environment:
+      POSTGRES_USER: ${EDFI_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${EDFI_POSTGRES_PASSWORD:-980jlej.23kd}
+      POSTGRES_DB: postgres
+    volumes:
+      - edfi-db-admin-data:/var/lib/postgresql/data
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ed-Fi API
+  edfi-api:
+    image: edfialliance/ods-api-web-api:v7.1-postgresql
+    environment:
+      POSTGRES_USER: ${EDFI_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${EDFI_POSTGRES_PASSWORD:-980jlej.23kd}
+      POSTGRES_PORT: 5432
+      ODS_POSTGRES_HOST: edfi-db-ods
+      ADMIN_POSTGRES_HOST: edfi-db-admin
+      PATH_BASE: ""
+      TPDM_ENABLED: ${TPDM_ENABLED:-true}
+      NPG_POOLING_ENABLED: ${NPG_POOLING_ENABLED:-false}
+      ODS_CONNECTION_STRING_ENCRYPTION_KEY: ${ODS_CONNECTION_STRING_ENCRYPTION_KEY:-+MkpJfdOoBs2W+UCibqwMcjAF5rUUk6AxPiOAIFNEWQ=}
+    depends_on:
+      edfi-db-ods:
+        condition: service_healthy
+      edfi-db-admin:
+        condition: service_healthy
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--output-document=/dev/null", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ed-Fi Swagger UI
+  edfi-swagger:
+    image: edfialliance/ods-api-swaggerui:v7.1
+    environment:
+      SAMPLE_KEY: ${POPULATED_KEY:-populatedKey}
+      SAMPLE_SECRET: ${POPULATED_SECRET:-populatedSecret}
+      VERSION_URL: http://edfi-api
+    depends_on:
+      - edfi-api
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--output-document=/dev/null", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ed-Fi Sandbox Admin
+  edfi-sandbox:
+    image: edfialliance/ods-api-web-sandbox-admin:v7.1-postgresql
+    environment:
+      PATH_BASE: sandbox
+      OAUTH_URL: http://edfi-api/oauth/
+      POSTGRES_USER: ${EDFI_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${EDFI_POSTGRES_PASSWORD:-980jlej.23kd}
+      POSTGRES_PORT: 5432
+      ODS_POSTGRES_HOST: edfi-db-ods
+      ADMIN_POSTGRES_HOST: edfi-db-admin
+      NPG_POOLING_ENABLED: ${NPG_POOLING_ENABLED:-false}
+      ADMIN_USER: ${ADMIN_USER:-test@ed-fi.org}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-y79mwc5hWb6K0gIlCDPvf}
+      MINIMAL_KEY: ${MINIMAL_KEY:-minimalKey}
+      MINIMAL_SECRET: ${MINIMAL_SECRET:-minimalSecret}
+      POPULATED_KEY: ${POPULATED_KEY:-populatedKey}
+      POPULATED_SECRET: ${POPULATED_SECRET:-populatedSecret}
+    depends_on:
+      - edfi-api
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SIS Backend
+  sis-backend:
+    build:
+      context: ./sis-backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://${SIS_POSTGRES_USER:-postgres}:${SIS_POSTGRES_PASSWORD:-980jlej.23kd}@sis-postgres:5432/${SIS_POSTGRES_DB:-sis_db}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      # Ed-Fi Configuration
+      EDFI_API_URL: http://edfi-api
+      EDFI_CLIENT_ID: ${POPULATED_KEY:-populatedKey}
+      EDFI_CLIENT_SECRET: ${POPULATED_SECRET:-populatedSecret}
+      # AWS Configuration (optional)
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    depends_on:
+      sis-postgres:
+        condition: service_healthy
+      edfi-api:
+        condition: service_healthy
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SIS Frontend
+  sis-frontend:
+    build:
+      context: ./sis-app
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${API_URL:-http://localhost/api}
+        VITE_EDFI_API_URL: ${EDFI_API_URL:-http://localhost/edfi}
+    depends_on:
+      - sis-backend
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.production.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - sis-frontend
+      - sis-backend
+      - edfi-api
+      - edfi-swagger
+      - edfi-sandbox
+    networks:
+      - sis-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  sis-network:
+    driver: bridge
+
+volumes:
+  sis-postgres-data:
+  edfi-db-ods-data:
+  edfi-db-admin-data:
