@@ -1,0 +1,212 @@
+version: '3.8'
+
+services:
+  # Ed-Fi ODS Database (same as your local setup)
+  edfi-db-ods:
+    image: pgbouncer/pgbouncer:latest
+    environment:
+      DATABASES_DEFAULT: postgres
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_USER: postgres
+      DATABASES_PASSWORD: 980jlej.23kd
+    networks:
+      - edfi-network
+    depends_on:
+      - postgres
+    restart: always
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 980jlej.23kd
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - edfi-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ed-Fi Admin Database
+  edfi-db-admin:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 980jlej.23kd
+      POSTGRES_DB: postgres
+    volumes:
+      - admin-postgres-data:/var/lib/postgresql/data
+    networks:
+      - edfi-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ed-Fi API (using official Ed-Fi Docker image)
+  edfi-api:
+    image: edfialliance/ods-api-web-api:v7.1
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 980jlej.23kd
+      POSTGRES_PORT: 5432
+      ODS_POSTGRES_HOST: postgres
+      ADMIN_POSTGRES_HOST: edfi-db-admin
+      PATH_BASE: ""
+      TPDM_ENABLED: "true"
+      NPG_POOLING_ENABLED: "false"
+      ODS_CONNECTION_STRING_ENCRYPTION_KEY: "+MkpJfdOoBs2W+UCibqwMcjAF5rUUk6AxPiOAIFNEWQ="
+    ports:
+      - "8001:80"
+    networks:
+      - edfi-network
+    depends_on:
+      - postgres
+      - edfi-db-admin
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--output-document=/dev/null", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ed-Fi Swagger UI
+  edfi-swagger:
+    image: edfialliance/ods-api-swaggerui:v7.1
+    environment:
+      SAMPLE_KEY: populatedKey
+      SAMPLE_SECRET: populatedSecret
+      VERSION_URL: http://edfi-api
+    ports:
+      - "8002:80"
+    networks:
+      - edfi-network
+    depends_on:
+      - edfi-api
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--output-document=/dev/null", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ed-Fi Sandbox Admin
+  edfi-sandbox:
+    image: edfialliance/ods-api-web-sandbox-admin:v7.1
+    environment:
+      PATH_BASE: sandbox
+      OAUTH_URL: http://edfi-api/oauth/
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 980jlej.23kd
+      POSTGRES_PORT: 5432
+      ODS_POSTGRES_HOST: postgres
+      ADMIN_POSTGRES_HOST: edfi-db-admin
+      NPG_POOLING_ENABLED: "false"
+      ADMIN_USER: test@ed-fi.org
+      ADMIN_PASSWORD: y79mwc5hWb6K0gIlCDPvf
+      MINIMAL_KEY: minimalKey
+      MINIMAL_SECRET: minimalSecret
+      POPULATED_KEY: populatedKey
+      POPULATED_SECRET: populatedSecret
+    ports:
+      - "8003:80"
+    networks:
+      - edfi-network
+    depends_on:
+      - edfi-api
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SIS PostgreSQL Database
+  sis-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 980jlej.23kd
+      POSTGRES_DB: sis_db
+    volumes:
+      - sis-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - edfi-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d sis_db -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SIS Backend (build from your code)
+  sis-backend:
+    build:
+      context: ./sis-backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:980jlej.23kd@sis-postgres:5432/sis_db
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      CORS_ORIGIN: "*"
+      EDFI_API_URL: http://edfi-api
+      EDFI_CLIENT_ID: populatedKey
+      EDFI_CLIENT_SECRET: populatedSecret
+    ports:
+      - "5000:5000"
+    networks:
+      - edfi-network
+    depends_on:
+      sis-postgres:
+        condition: service_healthy
+    restart: always
+
+  # SIS Frontend (build from your code)
+  sis-frontend:
+    build:
+      context: ./sis-app
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://3.81.79.72:5000
+    ports:
+      - "3000:80"
+    networks:
+      - edfi-network
+    depends_on:
+      - sis-backend
+    restart: always
+
+  # Main nginx proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - edfi-network
+    depends_on:
+      - sis-frontend
+      - sis-backend
+      - edfi-api
+    restart: always
+
+networks:
+  edfi-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  admin-postgres-data:
+  sis-postgres-data:
