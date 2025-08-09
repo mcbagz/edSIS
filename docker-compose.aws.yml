@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for SIS
+  sis-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SecurePassword123!
+      POSTGRES_DB: sis_db
+    volumes:
+      - sis-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d sis_db -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for Ed-Fi (using same instance for simplicity)
+  edfi-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SecurePassword123!
+      POSTGRES_MULTIPLE_DATABASES: EdFi_Ods,EdFi_Admin,EdFi_Security
+    volumes:
+      - edfi-postgres-data:/var/lib/postgresql/data
+      - ./init-edfi-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5433:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SIS Backend
+  sis-backend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./sis-backend:/app
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:SecurePassword123!@sis-postgres:5432/sis_db
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      CORS_ORIGIN: "*"
+    ports:
+      - "5000:5000"
+    command: >
+      sh -c "
+        npm install &&
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        npm run build &&
+        node dist/index.js
+      "
+    depends_on:
+      sis-postgres:
+        condition: service_healthy
+    restart: always
+
+  # SIS Frontend
+  sis-frontend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./sis-app:/app
+    environment:
+      VITE_API_URL: http://3.81.79.72:5000
+    ports:
+      - "3000:5173"
+    command: >
+      sh -c "
+        npm install &&
+        npm run dev -- --host
+      "
+    depends_on:
+      - sis-backend
+    restart: always
+
+  # Nginx Welcome Page (while Ed-Fi loads)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-welcome.html:/usr/share/nginx/html/index.html:ro
+    restart: always
+
+volumes:
+  sis-postgres-data:
+  edfi-postgres-data:
